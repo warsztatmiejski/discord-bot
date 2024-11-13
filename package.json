@@ -1,0 +1,25 @@
+{
+  "name": "discord",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@discordjs/builders": "^1.9.0",
+    "@discordjs/rest": "^2.4.0",
+    "discord-api-types": "^0.37.104",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "google-auth-library": "^9.14.2",
+    "googleapis": "^144.0.0",
+    "node-fetch": "^2.7.0",
+    "open": "^8.4.0",
+    "server-destroy": "^1.0.1"
+  }
+}
