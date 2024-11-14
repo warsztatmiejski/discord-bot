@@ -15,10 +15,10 @@ const {
 	uploadFileToGoogleDrive,
 	listFoldersInDrive,
 	createFolderInDrive,
-	getFolderNameById,
+	getFolderInfoById,
 } = require('./googleDrive');
 
-const MEDIA_CHANNEL_ID = process.env.MEDIA_CHANNEL_ID; // Moved to .env
+const MEDIA_CHANNEL_ID = process.env.MEDIA_CHANNEL_ID;
 
 async function handleMediaMessage(client, message) {
 	if (message.author.bot) return;
@@ -154,12 +154,15 @@ async function handleMediaInteraction(client, interaction) {
 
 			// Get the folder name
 			let folderName = '';
+			let folderLink = '';
 			try {
-				folderName = await getFolderNameById(authClient, selectedFolderId);
+				const folderInfo = await getFolderInfoById(authClient, selectedFolderId);
+				  folderName = folderInfo.name;
+				  folderLink = folderInfo.webViewLink;
 			} catch (error) {
-				console.error('Error fetching folder name:', error);
+				console.error('Error fetching folder info:', error);
 				await interaction.reply({
-					content: 'Błąd pobierania nazwy folderu.',
+					content: 'Błąd pobierania danych folderu.',
 					ephemeral: true,
 				});
 				return;
@@ -171,7 +174,7 @@ async function handleMediaInteraction(client, interaction) {
 				components: [],
 			});
 
-			await uploadMediaToDrive(interaction, selectedFolderId, messageId, folderName);
+			await uploadMediaToDrive(interaction, selectedFolderId, messageId, folderName, folderLink);
 		}
 	}
 
@@ -210,6 +213,7 @@ async function handleMediaInteraction(client, interaction) {
 		let newFolder;
 		try {
 			newFolder = await createFolderInDrive(authClient, folderName);
+			const folderLink = newFolder.webViewLink;
 		} catch (error) {
 			console.error('Error creating folder:', error);
 			await interaction.reply({
@@ -221,12 +225,12 @@ async function handleMediaInteraction(client, interaction) {
 
 		// Proceed to upload media to the new folder
 		await interaction.deferReply({ ephemeral: true });
-		await uploadMediaToDrive(interaction, newFolder.id, messageId, folderName);
+		await uploadMediaToDrive(interaction, newFolder.id, messageId, folderName, folderLink);
 	}
 
 }
 
-async function uploadMediaToDrive(interaction, folderId, originalMessageId, folderName) {
+async function uploadMediaToDrive(interaction, folderId, originalMessageId, folderName, folderLink) {
 	// Retrieve the original message from the guild channel
 	let message;
 	try {
@@ -298,7 +302,7 @@ async function uploadMediaToDrive(interaction, folderId, originalMessageId, fold
 
 	// Send the confirmation message as a reply to the original media message
 	await message.reply({
-		content: `Media zapisane na dysku Google w Social Media/${folderName}.`,
+		content: `Media zapisane na dysku Google w [Social Media/${folderName}](${folderLink}).`,
 	});
 
 	// Delete the interaction reply if necessary

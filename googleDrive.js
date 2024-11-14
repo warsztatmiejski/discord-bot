@@ -122,12 +122,12 @@ async function createFolderInDrive(authClient, folderName) {
 	};
 
 	const res = await drive.files.create({
-		resource: fileMetadata,
-		fields: 'id, name',
+		requestBody: fileMetadata,
+		fields: 'id, name, webViewLink',
 		supportsAllDrives: true,
 	});
 
-	return res.data;
+	return res.data; // Contains id, name, and webViewLink
 }
 
 // Function to upload a file to the specified folder in the shared drive
@@ -167,16 +167,19 @@ async function uploadFileToGoogleDrive(authClient, mediaUrl, fileName, folderId,
 }
 
 // Retrieve the folder name
-async function getFolderNameById(authClient, folderId) {
+async function getFolderInfoById(authClient, folderId) {
 	const drive = google.drive({ version: 'v3', auth: authClient });
 
 	const res = await drive.files.get({
 		fileId: folderId,
-		fields: 'name',
+		fields: 'name, webViewLink',
 		supportsAllDrives: true,
 	});
 
-	return res.data.name;
+	return {
+		name: res.data.name,
+		webViewLink: res.data.webViewLink,
+	};
 }
 
 module.exports = {
@@ -184,5 +187,5 @@ module.exports = {
 	uploadFileToGoogleDrive,
 	listFoldersInDrive,
 	createFolderInDrive,
-	getFolderNameById,
+	getFolderInfoById,
 };
