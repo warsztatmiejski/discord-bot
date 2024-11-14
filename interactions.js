@@ -24,18 +24,22 @@ const keywordResponses = [{
 		response: "_Piła piła, aż się upiła_ 🥴 Do pracy zawsze przychodź trzeźwy!",
 	},
 	{
+		keywords: ['dziura', 'dziury'],
+		response: "Do zalepienia dziury wystarczy trochę czekolady i kwasu siarkowego.",
+	},
+	{
 		keywords: ['problem'],
 		response: "_Problemem nie jest problem. Problemem jest twoje nastawienie do problemu._ Kapitan Jack Sparrow",
 	},
 	{
 		keywords: ['zrobię', 'mogę zrobić'],
-		response: "_Obiecanki cacanki, a głupiemu radość_ 🤡 Zastanów się – czy na pewno dasz radę to zrobić? Potem już nikt ci nie uwierzy.",
+		response: "_Obiecanki cacanki, a głupiemu radość_ 🤡 Zastanów się czy na pewno dasz radę to zrobić? Potem już nikt ci nie uwierzy.",
 	},
 	// Add more keyword responses as needed
 ];
 
 const keywordCooldowns = new Map();
-const COOLDOWN_TIME = 10 * 60 * 1000; // 10 minutes
+const COOLDOWN_TIME = 24 * 60 * 60 * 1000; // 24 hours
 
 async function handleMessageCreate(client, message) {
 	if (message.author.bot) return;
@@ -65,7 +69,7 @@ async function handleMessageCreate(client, message) {
 
 				// Send the response, quoting the original message
 				await message.channel.send({
-					content: `${response}\n\n> ${highlightedMessage}`,
+					content: `> ${highlightedMessage}\n\n${response}`,
 				});
 
 				// Update the cooldown for this response
