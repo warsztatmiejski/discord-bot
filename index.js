@@ -1,8 +1,11 @@
-// index.js
+// Discord Bot
+
 require('dotenv').config();
 
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
-const { handleMessageCreate, handleInteraction } = require('./interactions');
+const { handleMediaMessage, handleMediaInteraction } = require('./media');
+const { handleKeywordResponse } = require('./keywords');
+const { handleCommand } = require('./commands');
 
 // Initialize the Discord client
 const client = new Client({
@@ -21,18 +24,26 @@ client.once('ready', () => {
 
 // Event listener for messages
 client.on('messageCreate', async (message) => {
-	await handleMessageCreate(client, message);
+	// Handle keyword responses
+	await handleKeywordResponse(message);
+
+	// Handle media uploads
+	await handleMediaMessage(client, message);
 });
 
 // Event listener for interactions (buttons, modals, select menus, slash commands)
 client.on('interactionCreate', async (interaction) => {
-	await handleInteraction(client, interaction);
+	// Handle slash commands
+	await handleCommand(client, interaction);
+
+	// Handle interactions related to media uploads
+	await handleMediaInteraction(client, interaction);
 });
 
 // Welcome message event listener
 client.on('guildMemberAdd', async (member) => {
 	// Post to your welcome channel
-	const channel = member.guild.channels.cache.get(1195001927717638227);
+	const channel = member.guild.channels.cache.get(process.env.WELCOME_CHANNEL_ID);
 
 	if (channel) {
 		const welcomeMessage = `<@${member.id}> właśnie dołączył/a do społeczności Warsztatu Miejskiego. Powitajmy ją/go gromkim 'hip hip hurra!'`;
@@ -42,7 +53,7 @@ client.on('guildMemberAdd', async (member) => {
 			console.error(`Could not send welcome message: ${error}`);
 		}
 	} else {
-		console.error('Channel not found');
+		console.error('Welcome channel not found');
 	}
 });
 
