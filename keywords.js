@@ -24,7 +24,7 @@ const keywordResponses = [{
 ];
 
 const keywordCooldowns = new Map();
-const COOLDOWN_TIME = 10 * 60 * 1000; // 10 minutes
+const COOLDOWN_TIME = 72 * 60 * 60 * 1000; // 3 days
 
 async function handleKeywordResponse(message) {
 	if (message.author.bot) return;
