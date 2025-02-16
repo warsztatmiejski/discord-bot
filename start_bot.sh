@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Acquire a non-blocking lock on /tmp/discord-bot.lockfile
+exec 200>/tmp/discord-bot.lockfile
+flock -n 200 || { echo "$(date): Another instance is running. Exiting."; exit 1; }
+
 # Navigate to the bot directory
 cd /home/warsztatmiejski/domains/dev.warsztatmiejski.org/public_nodejs/discord/
 
