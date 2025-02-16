@@ -2,7 +2,17 @@
 
 require('dotenv').config();
 
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const {
+	Client,
+	GatewayIntentBits,
+	Partials,
+	InteractionType,
+	ModalBuilder,
+	TextInputBuilder,
+	TextInputStyle,
+	ActionRowBuilder,
+	ApplicationCommandType,
+} = require('discord.js');
 const { handleMediaMessage, handleMediaInteraction } = require('./media');
 const { handleKeywordResponse } = require('./keywords');
 const { handleCommand } = require('./commands');
@@ -35,6 +45,60 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
 	// Handle slash commands
 	await handleCommand(client, interaction);
+
+	// Context menu
+	if (
+		interaction.isMessageContextMenuCommand() &&
+		interaction.commandName === 'Reply as Bot'
+	) {
+		// The user triggered "Apps → Reply as Bot" on a message
+		const modal = new ModalBuilder()
+			.setCustomId('botReplyModal_' + interaction.targetId)
+			.setTitle('Reply as Bot');
+
+		const replyInput = new TextInputBuilder()
+			.setCustomId('replyText')
+			.setLabel('Co na to Św. McGyver?')
+			.setStyle(TextInputStyle.Paragraph)
+			.setRequired(true);
+
+		const row = new ActionRowBuilder().addComponents(replyInput);
+		modal.addComponents(row);
+
+		await interaction.showModal(modal);
+		return;
+	}
+
+	// Modal submission
+	if (
+		interaction.type === InteractionType.ModalSubmit &&
+		interaction.customId.startsWith('botReplyModal_')
+	) {
+		// Extract message ID from the customId
+		const targetMessageId = interaction.customId.split('_')[1];
+		const replyText = interaction.fields.getTextInputValue('replyText');
+
+		try {
+			// Fetch the channel and message
+			const channel = await client.channels.fetch(interaction.channelId);
+			const targetMessage = await channel.messages.fetch(targetMessageId);
+
+			await targetMessage.reply(replyText);
+
+			// Confirm success to user
+			await interaction.reply({
+				content: 'Bot replied successfully!',
+				ephemeral: true,
+			});
+		} catch (error) {
+			console.error('Error replying as bot:', error);
+			await interaction.reply({
+				content: 'Something went wrong replying as the bot.',
+				ephemeral: true,
+			});
+		}
+		return;
+	}
 
 	// Handle interactions related to media uploads
 	await handleMediaInteraction(client, interaction);
