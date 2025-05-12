@@ -7,8 +7,11 @@ const { ApplicationCommandType } = require('discord-api-types/v10');
 
 const slashCommands = [
 	new SlashCommandBuilder()
+	.setName('reakcje')
+	.setDescription('Włącz/wyłącz reakcje na słowa kluczowe'),
+	new SlashCommandBuilder()
 	.setName('ludzie')
-	.setDescription('List the number of all server users')
+	.setDescription('Wylistyj wszystkich użytkowników serwera')
 	.toJSON(),
 ];
 

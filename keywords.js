@@ -1,5 +1,8 @@
 // keywords.js
 
+const fs = require('fs');
+const CONFIG_PATH = './config.json';
+
 const keywordResponses = [{
 		keywords: ['młotek'],
 		response: "_Wlazł kotek na płotek i upuścił młotek_ 😱 Pamiętaj, robienie zbyt wielu rzeczy jednocześnie zazwyczaj źle się kończy.",
@@ -26,8 +29,14 @@ const keywordResponses = [{
 const keywordCooldowns = new Map();
 const COOLDOWN_TIME = 72 * 60 * 60 * 1000; // 3 days
 
+function isKeywordsEnabled() {
+  const config = JSON.parse(fs.readFileSync(CONFIG_PATH));
+  return config.keywordsEnabled;
+}
+
 async function handleKeywordResponse(message) {
 	if (message.author.bot) return;
+	if (!isKeywordsEnabled()) return;
 
 	// Handle keyword responses
 	for (const { keywords, response } of keywordResponses) {
