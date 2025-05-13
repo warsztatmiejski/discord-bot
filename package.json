@@ -21,6 +21,7 @@
     "googleapis": "^144.0.0",
     "node-fetch": "^2.7.0",
     "open": "^8.4.0",
+    "openai": "^4.98.0",
     "server-destroy": "^1.0.1"
   }
 }

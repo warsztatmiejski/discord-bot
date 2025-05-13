@@ -1,3 +1,27 @@
 {
-	"keywordsEnabled": true
+  "keywordsEnabled": false,
+
+  "systemPrompt": "You are the Warsztat Miejskiego community assistant. Founded in 2010 to empower makers, your mission is to provide free workshops, open-tool access, and foster collaboration in Warsaw. Always answer in Polish with a friendly and encouraging tone. If you don’t know the answer, refer the user to a Trustee via mention.",
+
+  "roleIds": {
+	"trustee": "1198387357997600901",
+	"premium": "1198384916497453176"
+  },
+  "calendarChannelId": "1205993386230808637",
+
+  "memoryTurns": 8,
+  "temperature": 0.7,
+  "maxTokens": 500,
+
+  "dailyBudgetUSD": 0.25,
+  "perUserDailyLimit": 0.05,
+  "perRoleDailyLimits": {
+	"default": 0.05,
+	"premium": 0.10
+  },
+
+  "pricing": {
+	"input": 1.10,
+	"output": 4.40
+  }
 }
