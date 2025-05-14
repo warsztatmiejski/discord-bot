@@ -2,184 +2,177 @@
 const fs = require('fs');
 const path = require('path');
 const { OpenAI } = require('openai');
+const {
+	EmbedBuilder,
+	ActionRowBuilder,
+	ButtonBuilder,
+	ButtonStyle
+} = require('discord.js');
 
 const configPath = path.resolve(__dirname, 'config.json');
-const costPath   = path.resolve(__dirname, 'cost-tracker.json');
+const costPath = path.resolve(__dirname, 'cost-tracker.json');
 
-// Load config & initialize cost tracker
 let config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-let costTracker = fs.existsSync(costPath)
-  ? JSON.parse(fs.readFileSync(costPath, 'utf8'))
-  : {};
+let costTracker = fs.existsSync(costPath) ?
+	JSON.parse(fs.readFileSync(costPath, 'utf8')) :
+	{};
 
-// Initialize OpenAI client
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// In-memory conversation memory: channelId → [{role,content}, …]
 const memory = new Map();
 
-// Helpers
-
 function saveCosts() {
-  fs.writeFileSync(costPath, JSON.stringify(costTracker, null, 2), 'utf8');
+	fs.writeFileSync(costPath, JSON.stringify(costTracker, null, 2), 'utf8');
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+	return new Date().toISOString().slice(0, 10);
 }
 
 function getRoleLimit(member) {
-  const perRole = config.perRoleDailyLimits;
-  for (const [roleName, usd] of Object.entries(perRole)) {
-	if (roleName !== 'default' && member.roles.cache.has(config.roleIds[roleName])) {
-	  return usd;
+	const perRole = config.perRoleDailyLimits;
+	for (const [roleName, usd] of Object.entries(perRole)) {
+		if (roleName !== 'default' && member.roles.cache.has(config.roleIds[roleName])) {
+			return usd;
+		}
 	}
-  }
-  return perRole.default;
+	return perRole.default;
 }
 
-function trackCost(userId, promptTokens, completionTokens) {
-  const day = todayKey();
-  const entry = costTracker[day] || { totalUSD: 0, users: {} };
-
-  const usdCost =
-	(promptTokens    / 1e6) * config.pricing.input  +
-	(completionTokens / 1e6) * config.pricing.output;
-
-  entry.totalUSD          = (entry.totalUSD  || 0) + usdCost;
-  entry.users[userId]     = (entry.users[userId] || 0) + usdCost;
-  costTracker[day]        = entry;
-  saveCosts();
-
-  // Log per-call usage
-  console.log(
-	`💬 [AI] Tokens in: ${promptTokens}, out: ${completionTokens}, cost: $${usdCost.toFixed(6)}`
-  );
-
-  return usdCost;
+function trackCost(userId, inToks, outToks) {
+	const day = todayKey();
+	const entry = costTracker[day] || { totalUSD: 0, users: {} };
+	const usd = (inToks / 1e6) * config.pricing.input + (outToks / 1e6) * config.pricing.output;
+	entry.totalUSD = (entry.totalUSD || 0) + usd;
+	entry.users[userId] = (entry.users[userId] || 0) + usd;
+	costTracker[day] = entry;
+	saveCosts();
+	console.log(`💬 [AI] in:${inToks} out:${outToks} cost:$${usd.toFixed(6)}`);
+	return usd;
 }
 
 function appendMemory(channelId, role, content) {
-  const maxMsgs = config.memoryTurns * 2;
-  const convo   = memory.get(channelId) || [];
-  convo.push({ role, content });
-  if (convo.length > maxMsgs) convo.shift();
-  memory.set(channelId, convo);
+	const maxMsgs = config.memoryTurns * 2;
+	const convo = memory.get(channelId) || [];
+	convo.push({ role, content });
+	if (convo.length > maxMsgs) convo.shift();
+	memory.set(channelId, convo);
 }
 
-// Main handler
 module.exports = {
-  async handleMention(message) {
-	try {
-	  console.log(`🔔 [AI] handleMention: ${message.author.tag}`);
+	async handleMention(message) {
+		try {
+			const userText = message.content.replace(/<@!?\d+>/g, '').trim();
 
-	  if (!process.env.OPENAI_API_KEY) {
-		console.error('❌ Missing OPENAI_API_KEY');
-		return message.reply('AI API key not configured.');
-	  }
+			// ——— Early-exit for “wydarzenia” ———
+			if (/wydarze/i.test(userText)) {
+				const all = await message.guild.scheduledEvents.fetch();
+				const upcoming = all
+					.filter(e => e.status === 2)
+					.sort((a, b) => a.scheduledStartTimestamp - b.scheduledStartTimestamp)
+					.first(5);
 
-	  // Budget checks
-	  const day       = todayKey();
-	  const userId    = message.author.id;
-	  const entry     = costTracker[day] || { totalUSD: 0, users: {} };
-	  const userUSD   = entry.users[userId] || 0;
-	  const totalUSD  = entry.totalUSD || 0;
-	  const userLimit = getRoleLimit(message.member);
+				const embed = new EmbedBuilder().setTitle('Nadchodzące wydarzenia');
+				if (upcoming.length) {
+					upcoming.forEach(evt => {
+						const t = `<t:${Math.floor(evt.scheduledStartTimestamp/1000)}:f>`;
+						embed.addFields({ name: evt.name, value: `${t}\n<#${config.calendarChannelId}>` });
+					});
+				} else {
+					embed.setDescription(
+						`Brak zaplanowanych wydarzeń.\n` +
+						`Sprawdź pełny harmonogram na <#${config.calendarChannelId}>.`
+					);
+				}
 
-	  if (totalUSD >= config.dailyBudgetUSD) {
-		return message.reply('Dzienny budżet AI został wyczerpany. Spróbuj jutro.');
-	  }
-	  if (userUSD >= userLimit) {
-		return message.reply('Wyczerpałeś swój dzienny limit AI.');
-	  }
+				const btn = new ButtonBuilder()
+					.setLabel('Przejdź do Wydarzeń')
+					.setStyle(ButtonStyle.Link)
+					.setURL(`https://discord.com/channels/${message.guild.id}/${config.calendarChannelId}`);
 
-	  // Build history
-	  const channelId = message.channelId;
-	  const convo     = memory.get(channelId) || [];
-	  const userText  = message.content.replace(/<@!?\d+>/g, '').trim();
+				return message.reply({ embeds: [embed], components: [new ActionRowBuilder().addComponents(btn)] });
+			}
 
-	  const baseMessages = [
-		{ role: 'system', content: config.systemPrompt },
-		...convo,
-		{ role: 'user',   content: userText }
-	  ];
+			// ——— Otherwise, regular AI flow ———
+			console.log(`🔔 [AI] handleMention: ${message.author.tag}`);
+			if (!process.env.OPENAI_API_KEY)
+				return message.reply('AI API key not configured.');
 
-	  console.log(
-		`📝 [AI] prompt chars: ${
-		  baseMessages.reduce((sum, m) => sum + m.content.length, 0)
-		}`
-	  );
+			// budget
+			const day = todayKey();
+			const userId = message.author.id;
+			const entry = costTracker[day] || { totalUSD: 0, users: {} };
+			const userUSD = entry.users[userId] || 0;
+			const totUSD = entry.totalUSD || 0;
+			const limUSD = getRoleLimit(message.member);
+			if (totUSD >= config.dailyBudgetUSD)
+				return message.reply('Dzienny budżet AI wyczerpany.');
+			if (userUSD >= limUSD)
+				return message.reply('Twój dzienny limit AI wyczerpany.');
 
-	  // Auto-continue loop
-	  let messages     = [...baseMessages];
-	  let fullReply    = '';
-	  let finishReason = null;
+			// history
+			const chanId = message.channelId;
+			const convo = memory.get(chanId) || [];
+			const base = [
+				{ role: 'system', content: config.systemPrompt },
+				...convo,
+				{ role: 'user', content: userText }
+			];
+			console.log(`📝 [AI] prompt chars:${base.reduce((s,m)=>s+m.content.length,0)}`);
 
-	  do {
-		const res = await openai.chat.completions.create({
-		  model:                 'o4-mini',
-		  messages,
-		  max_completion_tokens: config.maxCompletionTokens
-		});
+			// auto-continue
+			let msgs = [...base],
+				full = '',
+				fin;
+			do {
+				const res = await openai.chat.completions.create({
+					model: 'o4-mini',
+					messages: msgs,
+					max_completion_tokens: config.maxCompletionTokens
+				});
+				const c = res.choices[0];
+				fin = c.finish_reason;
+				const chunk = (c.message.content || '').trim();
+				trackCost(userId, res.usage.prompt_tokens, res.usage.completion_tokens);
+				if (fin === 'content_filter')
+					return message.reply('Przepraszam, treść narusza zasady.');
+				full += chunk;
+				if (fin === 'length') {
+					msgs.push({ role: 'assistant', content: chunk });
+					msgs.push({ role: 'user', content: 'Kontynuuj.' });
+				}
+			} while (fin === 'length');
 
-		const choice = res.choices[0];
-		finishReason = choice.finish_reason; // 'stop' | 'length' | 'content_filter'
-		const chunk   = (choice.message.content || '').trim();
+			if (!full)
+				return message.reply('Brak odpowiedzi od AI.');
 
-		// Track this chunk's cost
-		trackCost(
-		  userId,
-		  res.usage.prompt_tokens,
-		  res.usage.completion_tokens
-		);
+			// summarize if >2000 chars
+			if (full.length > 2000) {
+				console.log('✂️ Summarizing to fit 2k chars…');
+				const sum = await openai.chat.completions.create({
+					model: 'o4-mini',
+					messages: [
+						{ role: 'system', content: 'Podsumuj w max 2000 znakach, zachowując kluczowe info.' },
+						{ role: 'user', content: full }
+					],
+					max_completion_tokens: config.maxCompletionTokens
+				});
+				const sc = sum.choices[0];
+				full = (sc.message.content || '').trim();
+				trackCost(userId, sum.usage.prompt_tokens, sum.usage.completion_tokens);
+			}
 
-		if (finishReason === 'content_filter') {
-		  return message.reply(
-			'Przepraszam, Twoja prośba narusza zasady bezpieczeństwa.'
-		  );
+			// memory & trustee
+			appendMemory(chanId, 'user', userText);
+			appendMemory(chanId, 'assistant', full);
+			full = full.replace(/\[TRUSTEE\]/g, `<@&${config.roleIds.trustee}>`);
+
+			// **PLAIN** reply for all non-event queries
+			await message.reply({ content: full, allowedMentions: { roles: [config.roleIds.trustee] } });
+
+			console.log(`💰 [AI] Daily spend: $${costTracker[day].totalUSD.toFixed(6)}`);
+		} catch (err) {
+			console.error('❌ Error in handleMention:', err);
+			try { await message.reply('Błąd podczas AI.'); } catch {}
 		}
-
-		fullReply += chunk;
-
-		if (finishReason === 'length') {
-		  // prepare for continuation
-		  messages.push({ role: 'assistant', content: chunk });
-		  messages.push({ role: 'user',      content: 'Kontynuuj.' });
-		}
-	  } while (finishReason === 'length');
-
-	  if (!fullReply) {
-		return message.reply(
-		  'Przepraszam, nie otrzymałem odpowiedzi od AI. Spróbuj ponownie.'
-		);
-	  }
-
-	  // Save memory
-	  appendMemory(channelId, 'user',      userText);
-	  appendMemory(channelId, 'assistant', fullReply);
-
-	  // Replace trustee placeholder
-	  fullReply = fullReply.replace(
-		/\[TRUSTEE\]/g,
-		`<@&${config.roleIds.trustee}>`
-	  );
-
-	  // Reply
-	  await message.reply({
-		content: fullReply,
-		allowedMentions: { roles: [config.roleIds.trustee] }
-	  });
-
-	  // Log daily spend
-	  console.log(
-		`💰 [AI] Daily spend: $${costTracker[day].totalUSD.toFixed(6)}`
-	  );
 	}
-	catch (err) {
-	  console.error('❌ Error in handleMention:', err);
-	  try {
-		await message.reply('Wystąpił błąd podczas generowania odpowiedzi AI.');
-	  } catch {}
-	}
-  }
 };
