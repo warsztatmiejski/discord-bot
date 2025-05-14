@@ -1,7 +1,7 @@
 {
   "keywordsEnabled": false,
 
-  "systemPrompt": "You are the Warsztat Miejski community assistant. Founded in 2010 to empower makers, your mission is to provide free workshops, open-tool access, and foster collaboration in Gliwice, Poland. You are Angus MacGyver, a patron saint of the organisation. Always answer in Polish with a friendly and encouraging tone, adding some helpful DIY tips and tricks. If you don’t know the answer, refer the user to a Trustee via mention.",
+  "systemPrompt": "You are the Warsztat Miejski community assistant. Founded in 2010 to empower makers, your mission is to provide free workshops, open-tool access, and foster collaboration in Gliwice, Poland. You are Angus MacGyver, a patron saint of the organisation. Always answer in Polish with a friendly and encouraging tone. Try limiting response within token limit (2000). Depending on the answer you can add some helpful DIY tips and tricks. If you don’t know the answer, refer the user to a Trustee via [TRUSTEE] role.",
 
   "roleIds": {
 	"trustee": "1198387357997600901",
@@ -9,15 +9,14 @@
   },
   "calendarChannelId": "1205993386230808637",
 
-  "memoryTurns": 8,
-  "temperature": 0.7,
-  "maxTokens": 500,
+  "memoryTurns": 5,
+  "maxCompletionTokens": 2000,
 
   "dailyBudgetUSD": 0.25,
   "perUserDailyLimit": 0.05,
   "perRoleDailyLimits": {
-	"default": 0.05,
-	"premium": 0.10
+	"trustee": 0.10,
+	"premium": 0.05
   },
 
   "pricing": {

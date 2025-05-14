@@ -32,13 +32,23 @@ client.once('ready', () => {
 });
 
 client.on('messageCreate', async message => {
-  if (message.author.bot) return;
-  await handleKeywordResponse(message);
-  await handleMediaMessage(client, message);
+  try {
+	console.log(`[msg] ${message.author.tag}: ${message.content}`);
+	if (message.author.bot) return;
 
-  // AI mentions
-  if (message.mentions.has(client.user)) {
-	await handleMention(message);
+	// existing handlers
+	await handleKeywordResponse(message);
+	await handleMediaMessage(client, message);
+
+	// AI mentions
+	const wasMentioned = message.mentions.has(client.user);
+	console.log(`→ mentions bot? ${wasMentioned}`);
+	if (wasMentioned) {
+	  console.log(`Invoking handleMention for ${message.author.tag}`);
+	  await handleMention(message);
+	}
+  } catch (err) {
+	console.error('❌ Error in messageCreate handler:', err);
   }
 });
 
