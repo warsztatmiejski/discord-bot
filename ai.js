@@ -60,6 +60,7 @@ function appendMemory(channelId, role, content) {
 
 module.exports = {
 	async handleMention(message) {
+		if (message.mentions.everyone) return; // ignore @here and @everyone
 		try {
 			const userText = message.content.replace(/<@!?\d+>/g, '').trim();
 
