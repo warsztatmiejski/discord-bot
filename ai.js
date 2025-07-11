@@ -38,10 +38,14 @@ function getRoleLimit(member) {
 	return perRole.default;
 }
 
-function trackCost(userId, pToks, cToks, model) {
+function trackCost(userId, usage, model) {
 	const day = todayKey();
 	const entry = costTracker[day] || { totalUSD: 0, users: {} };
 	const pricing = config.pricing[model] || config.pricing['o4-mini']; // Fixed: fallback pricing
+
+	// Handle Responses API usage format
+	const pToks = usage.prompt_tokens || usage.input_tokens || 0;
+	const cToks = usage.completion_tokens || usage.output_tokens || 0;
 
 	const usd = (pToks / 1e6) * pricing.input + (cToks / 1e6) * pricing.output;
 
@@ -49,7 +53,7 @@ function trackCost(userId, pToks, cToks, model) {
 	entry.users[userId] = (entry.users[userId] || 0) + usd;
 	costTracker[day] = entry;
 	saveCosts();
-	console.log(`💬 [AI] ${model} cost:$${usd.toFixed(6)} (${pToks}p, ${cToks}c)`);
+	console.log(`💬 [AI] ${model} cost:${usd.toFixed(6)} (${pToks}p, ${cToks}c)`);
 }
 
 function appendMemory(chanId, role, content) {
@@ -155,12 +159,7 @@ module.exports = {
 			});
 			lastRespId = resp.id;
 
-			trackCost(
-				uid,
-				resp.usage.prompt_tokens,
-				resp.usage.completion_tokens,
-				MODEL
-			);
+			trackCost(uid, resp.usage, MODEL);
 
 			let full = resp.output_text || '';
 
@@ -176,7 +175,7 @@ module.exports = {
 					input: [{ role: 'user', content: [{ type: 'input_text', text: full }] }]
 				});
 
-				trackCost(uid, sumResp.usage.prompt_tokens, sumResp.usage.completion_tokens, MODEL);
+				trackCost(uid, sumResp.usage, MODEL);
 				full = (sumResp.output_text || '').trim();
 			}
 
