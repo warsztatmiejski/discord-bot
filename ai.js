@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const OpenAI = require('openai').default;
+const { getRelevantContext } = require('./warsztat-miejski');
 
 // — Paths & Config —
 const configPath = path.resolve(__dirname, 'config.json');
@@ -138,7 +139,7 @@ module.exports = {
 			multimodalInput.push({
 				role: 'user',
 				content: [
-					{ type: 'input_text', text: userText },
+					{ type: 'input_text', text: userText + getRelevantContext(userText) },
 					// if there's an image, tack on an image block:
 					...(attachment ?
 						[{ type: 'input_image', image_url: attachment.url }] :
@@ -153,7 +154,17 @@ module.exports = {
 			const resp = await openai.responses.create({
 				model: MODEL,
 				instructions: config.systemPrompt,
-				tools: [{ type: 'web_search' }],
+				tools: [
+					{
+						type: 'web_search'
+					},
+					{
+						type: 'code_interpreter',
+						container: {
+							type: 'auto'
+						}
+					}
+				],
 				input: multimodalInput,
 				previous_response_id: lastRespId
 			});

@@ -1,0 +1,175 @@
+{
+	"basic": {
+		"name": "Warsztat Miejski",
+		"founded": "2018",
+		"location": "Gliwice, Poland",
+		"address": "ul. Pszczyńska 1, Gliwice",
+		"krs": "0000727198",
+		"website": "warsztatmiejski.org",
+		"mission": "Empower local makers, provide access to tools, foster collaboration and STEM education",
+		"legalBasis": "Registered association under Polish law, operating since 2018"
+	},
+
+	"financial": {
+		"bankAccount": "46 1750 0012 0000 0000 3983 0191",
+		"membershipFee": "50 PLN per month per person",
+		"paymentPurposes": [
+			"składka członkowska (membership fee)",
+			"opłaty za warsztaty (workshop fees)",
+			"darowizny (donations)"
+		]
+	},
+
+	"officialGoals": {
+		"primary": [
+			"Promocja kultury 'make' i majsterkowania",
+			"Stworzenie i animowanie ogólnodostępnej przestrzeni warsztatowej dla majsterkowiczów, twórców i artystów",
+			"Wspieranie i upowszechnianie kultury i sztuki",
+			"Popularyzacja nauki i uczenia się",
+			"Promocja aktywności społecznej"
+		],
+		"education": [
+			"Promowanie idei edukacji STEAM (Science and Technology interpreted through Engineering and the Arts)",
+			"Edukacja w obszarze technologii informatycznych, ekologii, kultury, sztuki",
+			"Prototypowanie i wdrażanie nowych technologii, produktów i procesów",
+			"Podnoszenie świadomości społecznej w dziedzinie technologii open source"
+		],
+		"community": [
+			"Aktywizacja lokalnych społeczności poprzez działania związane z osobistą fabrykacją",
+			"Wspieranie małych i dużych środowisk lokalnych",
+			"Stworzenie środowiska sprzyjającego wzajemnej wymianie kompetencji",
+			"Działalność wspomagająca rozwój wspólnot i społeczności lokalnych"
+		]
+	},
+
+	"spaces": {
+		"workshop": {
+			"description": "Przestrzeń warsztatowa przy ul. Pszczyńskiej 1",
+			"components": ["przestrzeń warsztatowa", "magazynowa", "biurowa", "socjalna"],
+			"access": "Po wcześniejszym umówieniu się w trakcie godzin otwartych"
+		},
+		"woodworking": {
+			"description": "Osobna przestrzeń do obróbki drewna",
+			"mainTools": ["stół stolarski", "piła tarczowa", "wiertarka", "szlifierka", "dłuta"],
+			"safety": "Zawsze noś okulary ochronne i rękawice"
+		},
+		"ceramics": {
+			"description": "Przestrzeń ceramiczna",
+			"mainTools": ["koło garncarskie", "piec ceramiczny", "narzędzia rzeźbiarskie"],
+			"safety": "Uważaj na wysokie temperatury pieca"
+		},
+		"electronics": {
+			"description": "Laboratorium elektroniki i druku 3D",
+			"mainTools": ["lutownica", "multimetr", "zasilacz", "drukarki 3D", "oscyloskop"],
+			"safety": "Sprawdzaj napięcie przed pracą"
+		},
+		"darkroom": {
+			"description": "Ciemnia fotograficzna",
+			"mainTools": ["powiększalnik", "kuwety", "suszarka", "timery"],
+			"safety": "Używaj tylko czerwonego światła"
+		},
+		"openSpace": {
+			"description": "Ogólna przestrzeń otwarta",
+			"usage": "Spotkania, prezentacje, prace zespołowe"
+		}
+	},
+
+	"officialRules": {
+		"access": [
+			"Z Pracowni można korzystać po wcześniejszym umówieniu się w trakcie godzin otwartych",
+			"W Pracowni nie wolno przebywać bez udziału Dyżurnego",
+			"Z Pracowni mogą korzystać osoby pełnoletnie",
+			"Za bezpieczeństwo dzieci i młodzieży odpowiadają rodzice lub opiekunowie"
+		],
+		"safety": [
+			"Dostęp do niektórych urządzeń wymaga uprzedniego przeszkolenia",
+			"Obowiązkowe jest noszenie odzieży ochronnej i stosowanie zasad BHP",
+			"Zabronione jest korzystanie z uszkodzonego wyposażenia",
+			"Uszkodzenia należy zgłosić Dyżurnemu"
+		],
+		"behavior": [
+			"Zabrania się przebywania pod wpływem alkoholu lub innych środków odurzających",
+			"Użytkownik zobowiązany jest do posprzątania stanowiska pracy po zakończeniu użycia",
+			"W Pracowni obowiązuje segregacja odpadów",
+			"Zakaz palenia tytoniu (również e-papierosów)"
+		],
+		"projects": [
+			"Przechowywanie projektów jest możliwe za zgodą Stowarzyszenia",
+			"Stowarzyszenie nie ponosi odpowiedzialności za projekty nie zamknięte",
+			"Projekty pozostawione ponad 3 miesiące mogą zostać usunięte",
+			"Okres przechowywania jest każdorazowo ustalany ze Stowarzyszeniem"
+		]
+	},
+
+	"membership": {
+		"types": ["członkowie zwyczajni", "członkowie wspierający", "członkowie honorowi"],
+		"rights": [
+			"Korzystania z dorobku, majątku i wszelkich form działalności Stowarzyszenia",
+			"Udziału w zebraniach, wykładach oraz imprezach organizowanych przez Stowarzyszenie",
+			"Zgłaszania wniosków co do działalności Stowarzyszenia"
+		],
+		"duties": [
+			"Brania udziału w działalności Stowarzyszenia i realizacji jego celów",
+			"Przestrzegania statutu i uchwał władz Stowarzyszenia",
+			"Regularnego opłacania składek"
+		]
+	},
+
+	"governance": {
+		"authorities": ["Walne zebranie członków", "Zarząd", "Komisja Rewizyjna"],
+		"leadership": "Zarząd składa się z prezesa i od 3 do 5 członków zarządu",
+		"meetings": "Walne zebranie członków zwyczajne jest zwoływane raz na rok",
+		"kadencja": "Kadencja wszystkich władz wybieralnych trwa 3 lata"
+	},
+
+	"safetyTips": {
+		"general": [
+			"Zawsze noś odpowiednie okulary ochronne",
+			"Nie pracuj sam z niebezpiecznymi narzędziami",
+			"Znaj lokalizację apteczki i gaśnicy",
+			"Wyłączaj narzędzia po użyciu",
+			"Niektóre urządzenia wymagają wcześniejszego przeszkolenia"
+		],
+		"woodworking": [
+			"Sprawdzaj czy drewno nie ma gwoździ",
+			"Używaj prowadnic do równych cięć",
+			"Nie noś luźnej odzieży przy maszynach obrotowych"
+		],
+		"electronics": [
+			"Zawsze sprawdzaj polaryzację",
+			"Używaj maty antystatycznej",
+			"Nie lutuj bez wyciągu"
+		]
+	},
+
+	"commonCalculations": {
+		"woodworking": {
+			"boardFeet": "volume = (length × width × thickness) / 144 (in inches)",
+			"glueTime": "Większość klejów schnie 24h, ale można pracować po 1-2h"
+		},
+		"electronics": {
+			"ohmsLaw": "V = I × R, P = V × I",
+			"resistorSeries": "R_total = R1 + R2 + R3...",
+			"resistorParallel": "1/R_total = 1/R1 + 1/R2 + 1/R3..."
+		},
+		"printing3d": {
+			"printTime": "Zależy od wypełnienia, wysokości warstwy i złożoności",
+			"filamentLength": "1kg PLA ≈ 330m przy 1.75mm średnicy"
+		}
+	},
+
+	"keywords": {
+		"basic": ["warsztat", "miejski", "organization", "gdzie", "lokalizacja", "adres", "pszczyńska", "strona", "website"],
+		"financial": ["składka", "opłata", "płatność", "konto", "bank", "przelew", "członkowska", "fee", "donation", "darowizna"],
+		"access": ["dostęp", "godziny", "otwarte", "umówić", "dyżurny", "wstęp"],
+		"rules": ["regulamin", "zasady", "przepisy", "można", "wolno", "zabrania"],
+		"membership": ["członkostwo", "członek", "składki", "przystąpienie", "statut"],
+		"woodworking": ["drewn", "wood", "stol"],
+		"electronics": ["elektron", "lutow", "druk", "3d", "print"],
+		"ceramics": ["cerami", "glina", "koło", "piec"],
+		"darkroom": ["foto", "ciemn", "dark"],
+		"safety": ["bezpieczeń", "safety", "zasad", "rule", "bhp", "ochrona"],
+		"calculations": ["oblicz", "calculate", "resistor", "opór", "ohm"],
+		"projects": ["projekt", "przechowywanie", "magazyn", "pozostawienie"]
+	}
+}
