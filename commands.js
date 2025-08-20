@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { checkEmailsAndNotify } = require('./email-checker');
 
 const CONFIG_PATH = path.resolve(__dirname, 'config.json');
 const COST_PATH = path.resolve(__dirname, 'cost-tracker.json');
@@ -49,6 +50,22 @@ async function handleCommand(client, interaction) {
 				`• Twoje zużycie: **$${userUSD.toFixed(2)}**`,
 			ephemeral: true
 		});
+	}
+
+	if (cmd === 'faktury') {
+		// Manual email check (trustee only)
+		if (!interaction.member.roles.cache.has(config.roleIds.trustee)) {
+			return interaction.reply({ content: 'Brak uprawnień.', ephemeral: true });
+		}
+
+		await interaction.deferReply({ ephemeral: true });
+		try {
+			await checkEmailsAndNotify(client);
+			return interaction.followUp({ content: 'Sprawdzono emaile na faktury@warsztatmiejski.org.', ephemeral: true });
+		} catch (error) {
+			console.error('Error in manual email check:', error);
+			return interaction.followUp({ content: 'Błąd podczas sprawdzania emaili.', ephemeral: true });
+		}
 	}
 
 	if (cmd === 'kontekst') {

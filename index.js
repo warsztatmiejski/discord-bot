@@ -16,6 +16,7 @@ const { handleKeywordResponse } = require('./keywords');
 const { handleMediaMessage, handleMediaInteraction } = require('./media');
 const { handleCommand } = require('./commands');
 const { handleMention } = require('./ai');
+const { setupEmailChecking } = require('./email-checker');
 
 const client = new Client({
   intents: [
@@ -30,6 +31,7 @@ const client = new Client({
 
 client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
+  setupEmailChecking(client);
 });
 
 client.on('messageCreate', async message => {
