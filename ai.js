@@ -18,7 +18,7 @@ let costTracker = fs.existsSync(costPath) ?
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const memory = new Map();
 let lastRespId = null;
-const MODEL = config.model || 'o4-mini'; // Fixed: provide fallback
+const MODEL = config.model || 'o4-mini';
 
 // — Helpers —
 function saveCosts() {
@@ -42,7 +42,7 @@ function getRoleLimit(member) {
 function trackCost(userId, usage, model) {
 	const day = todayKey();
 	const entry = costTracker[day] || { totalUSD: 0, users: {} };
-	const pricing = config.pricing[model] || config.pricing['o4-mini']; // Fixed: fallback pricing
+	const pricing = config.pricing[model] || config.pricing['o4-mini'];
 
 	// Handle Responses API usage format
 	const pToks = usage.prompt_tokens || usage.input_tokens || 0;

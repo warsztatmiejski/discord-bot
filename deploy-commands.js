@@ -41,6 +41,27 @@ const commands = [
 	)
 	.toJSON(),
 
+	// /move (slash)
+	new SlashCommandBuilder()
+	  .setName('move')
+	  .setDescription('Move a replied message to another channel via webhook')
+	  .addChannelOption(opt =>
+		opt.setName('target')
+		   .setDescription('Destination channel')
+		   .setRequired(true)
+	  )
+	  .addBooleanOption(opt =>
+		opt.setName('delete_original')
+		   .setDescription('Delete the source message after moving')
+		   .setRequired(false)
+	  )
+	  .toJSON(),
+
+	// Move (Message Context Menu)
+	{
+		name: 'Move',
+		type: ApplicationCommandType.Message
+	},
 	// Message Context Menu: Reply as Bot
 	{
 		name: 'Reply as Bot',
