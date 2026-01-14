@@ -1,5 +1,7 @@
 // Media upload
 
+const fs = require('fs');
+const path = require('path');
 const {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -19,6 +21,23 @@ const {
 } = require('./googleDrive');
 
 const MEDIA_CHANNEL_ID = process.env.MEDIA_CHANNEL_ID;
+const CONFIG_PATH = path.resolve(__dirname, 'config.json');
+
+function getTrusteeRoleId() {
+	try {
+		const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+		return config?.roleIds?.trustee || null;
+	} catch {
+		return null;
+	}
+}
+
+function isAuthorizedInteractor(interaction, ownerUserId) {
+	if (interaction.user.id === ownerUserId) return true;
+	const trusteeRoleId = getTrusteeRoleId();
+	if (!trusteeRoleId) return false;
+	return Boolean(interaction.member?.roles?.cache?.has(trusteeRoleId));
+}
 
 async function handleMediaMessage(client, message) {
 	if (message.author.bot) return;
@@ -109,10 +128,10 @@ async function handleMediaInteraction(client, interaction) {
 	// Extract information from the custom ID
 	const [action, messageId, userId] = interaction.customId.split('|');
 
-	// Ensure only the original user can interact
-	if (interaction.user.id !== userId) {
+	// Ensure only the original user or trustees can interact
+	if (!isAuthorizedInteractor(interaction, userId)) {
 		await interaction.reply({
-			content: 'Nie masz autoryzacji aby to zrobić.',
+			content: 'Nie masz uprawnień, aby to zrobić.',
 			ephemeral: true,
 		});
 		return;
