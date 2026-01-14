@@ -199,15 +199,38 @@ async function handleMediaInteraction(client, interaction) {
 
 	// Handle cancel button
 	if (action === 'upload_cancel') {
-		await interaction.update({
-			content: 'Anulowano.',
-			components: [],
-		});
+		try {
+			if (!interaction.deferred && !interaction.replied) {
+				await interaction.deferUpdate();
+			}
+		} catch (error) {
+			console.error('Error deferring cancel interaction:', error);
+		}
+
+		try {
+			await interaction.message.edit({
+				content: 'Anulowano.',
+				components: [],
+			});
+		} catch (error) {
+			console.error('Error updating cancel message:', error);
+		}
+
+		try {
+			if (interaction.deferred || interaction.replied) {
+				await interaction.followUp({ content: 'Anulowano.', ephemeral: true });
+			} else {
+				await interaction.reply({ content: 'Anulowano.', ephemeral: true });
+			}
+		} catch (error) {
+			console.error('Error sending cancel confirmation:', error);
+		}
 
 		// Delete the original prompt message after a short delay
 		setTimeout(() => {
 			interaction.message.delete().catch(console.error);
 		}, 5000); // Adjust the delay as needed
+		return;
 	}
 
 	// Handle new folder creation modal submission
