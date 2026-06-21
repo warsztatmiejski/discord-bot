@@ -8,6 +8,8 @@ node_modules/
 credentials.json
 token.json
 token_drive.json
+token_gmail.json
+last_email_check.json
 
 # nova
 .nova
