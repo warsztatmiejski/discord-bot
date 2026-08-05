@@ -14,6 +14,7 @@ const {
 } = require('discord.js');
 const { handleKeywordResponse } = require('./keywords');
 const { handleMediaMessage, handleMediaInteraction } = require('./media');
+const { handleGalleryReaction } = require('./gallery');
 const { handleCommand } = require('./commands');
 const { handleMention } = require('./ai');
 const { setupEmailChecking } = require('./email-checker');
@@ -23,10 +24,11 @@ const client = new Client({
 	GatewayIntentBits.Guilds,
 	GatewayIntentBits.GuildMembers,
 	GatewayIntentBits.GuildMessages,
+	GatewayIntentBits.GuildMessageReactions,
 	GatewayIntentBits.MessageContent,
 	GatewayIntentBits.GuildScheduledEvents
   ],
-  partials: [Partials.Message, Partials.Channel]
+	partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
 client.once('ready', () => {
@@ -54,6 +56,8 @@ client.on('messageCreate', async message => {
 	console.error('❌ Error in messageCreate handler:', err);
   }
 });
+
+client.on('messageReactionAdd', handleGalleryReaction);
 
 client.on('interactionCreate', async interaction => {
   // Slash commands
