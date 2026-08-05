@@ -25,11 +25,11 @@ function getGalleryConfig() {
 	};
 }
 
-async function addStatusReaction(message, emoji) {
+async function removeGalleryReaction(reaction, userId) {
 	try {
-		await message.react(emoji);
+		await reaction.users.remove(userId);
 	} catch (error) {
-		console.error(`Could not add gallery status reaction ${emoji}:`, error);
+		console.error('Could not remove failed gallery reaction:', error);
 	}
 }
 
@@ -102,13 +102,12 @@ async function handleGalleryReaction(reaction, user) {
 			console.log(
 				`[gallery] message ${message.id}: uploaded ${uploadedCount}, already present ${existingCount}`
 			);
-			await addStatusReaction(message, '✅');
 		} finally {
 			processingMessageIds.delete(processingKey);
 		}
 	} catch (error) {
 		console.error('Gallery upload failed:', error);
-		await addStatusReaction(message, '❌');
+		await removeGalleryReaction(reaction, user.id);
 	}
 }
 
