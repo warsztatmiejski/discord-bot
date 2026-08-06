@@ -1,4 +1,4 @@
-# Discord Bot Warsztatu Miejskiego
+# Św. MacGyver – Bot Warsztatu Miejskiego na Discord
 
 Bot Discord dla społeczności Warsztatu Miejskiego. Obsługuje automatyzacje
 serwerowe, asystenta AI, powiadomienia o mailach z Gmaila oraz zapisywanie
@@ -23,7 +23,11 @@ mediów z Discorda na Google Drive.
   załączników, embedów i linku do źródła.
 - Obsługa mediów w wybranym kanale: użytkownik wybiera folder Google Drive albo
   tworzy nowy, a bot zapisuje obrazy/wideo z metadanymi autora.
-- Sprawdzanie Gmaila `faktury@warsztatmiejski.org`: automatycznie po starcie
+- Upload do galerii przez reakcję: użytkownik z rolą `trustee` dodaje do
+  wiadomości niestandardową reakcję `:gallery:`, a bot zapisuje jej obrazy i
+  filmy w folderze `Galeria` na Google Drive. Ponowne użycie reakcji nie tworzy
+  duplikatów tych samych załączników.
+- Sprawdzanie konta obsługi faktur na Gmailu automatycznie po starcie
   oraz codziennie o 09:00, 13:00 i 17:00 czasu serwera, plus ręcznie przez
   `/faktury`.
 
@@ -45,7 +49,11 @@ Zalecana wersja Node.js: 18 lub nowsza.
 - `ai.js` - asystent AI, pamięć rozmowy i liczenie kosztów.
 - `warsztat-miejski.js` oraz `warsztat-miejski.json` - lokalna baza wiedzy
   wstrzykiwana do promptu zależnie od pytania.
-- `media.js` i `googleDrive.js` - workflow uploadu mediów do Google Drive.
+- `media.js` i `googleDrive.js` - interaktywny workflow uploadu mediów do
+  Google Drive oraz wspólne operacje na plikach i folderach Drive.
+- `gallery.js` - obsługa reakcji `:gallery:` i upload załączników do galerii.
+- `gallery-utils.js` - filtrowanie obsługiwanych załączników i budowanie ich
+  metadanych Discorda; testy znajdują się w `gallery-utils.test.js`.
 - `gmail.js` i `email-checker.js` - autoryzacja Gmaila i powiadomienia o nowych
   nieprzeczytanych mailach.
 - `keywords.js` - reakcje na słowa kluczowe.
@@ -122,14 +130,17 @@ W Discord Developer Portal dla aplikacji bota włącz wymagane privileged intent
 - Message Content Intent - potrzebny do reakcji na słowa kluczowe, uploadu mediów
   i obsługi wzmianek AI.
 
+Bot korzysta również ze standardowego intentu `Guild Message Reactions`, aby
+obsługiwać reakcje `:gallery:` także dla wiadomości, których nie ma w cache.
+
 Bot wymaga uprawnień na serwerze odpowiednich do używanych funkcji:
 
 - czytanie wiadomości i historii wiadomości,
 - wysyłanie wiadomości i embedów,
+- zarządzanie wiadomościami, aby móc usunąć reakcję `:gallery:` po nieudanym
+  uploadzie oraz oryginał przy `/move delete_original:true`,
 - używanie slash commands,
 - zarządzanie webhookami dla `/move`,
-- zarządzanie wiadomościami, jeśli `/move delete_original:true` ma usuwać
-  oryginał,
 - dostęp do kanałów zdefiniowanych w `.env`.
 
 Po zmianie komend uruchom:
@@ -152,6 +163,10 @@ są sekretami:
   zmienić przez `/kontekst`.
 - `roleIds.trustee` i `roleIds.premium` - ID ról Discorda używane do uprawnień i
   limitów AI.
+- `gallery.emojiName` - nazwa niestandardowego emoji uruchamiającego upload do
+  galerii; domyślnie `gallery` (bez dwukropków).
+- `gallery.folderName` - nazwa folderu galerii na Google Drive; domyślnie
+  `Galeria`. Bot utworzy ten folder, jeśli jeszcze nie istnieje.
 - `calendarChannelId` - kanał kalendarza linkowany w odpowiedziach o wydarzeniach.
 - `memoryTurns` - liczba tur rozmowy pamiętanych per kanał w pamięci procesu.
 - `dailyBudgetUSD` - globalny dzienny limit kosztów AI.
@@ -235,6 +250,21 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
 - `Reply as Bot` - menu kontekstowe wiadomości, otwiera modal i odpowiada botem
   pod wskazaną wiadomością.
 
+### Upload do galerii przez reakcję
+
+1. Wiadomość musi zawierać co najmniej jeden załącznik typu obraz lub wideo.
+2. Użytkownik z rolą określoną w `roleIds.trustee` dodaje do wiadomości
+   niestandardową reakcję określoną przez `gallery.emojiName` (domyślnie
+   `:gallery:`).
+3. Bot tworzy lub odnajduje folder `gallery.folderName` na Google Drive i
+   zapisuje w nim obsługiwane załączniki wraz z informacjami o autorze, kanale i
+   wiadomości źródłowej.
+4. Każdy załącznik jest identyfikowany przez Discord attachment ID, więc kolejne
+   reakcje nie powodują ponownego uploadu tego samego pliku.
+
+Jeśli upload się nie powiedzie, bot usuwa reakcję użytkownika, sygnalizując, że
+operację można ponowić po usunięciu przyczyny błędu.
+
 ## Uwagi utrzymaniowe
 
 - Bot trzyma pamięć rozmowy AI tylko w pamięci procesu. Restart czyści kontekst
@@ -244,5 +274,5 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
   przeczytane. Duplikaty są ograniczane przez `last_email_check.json`.
 - OpenAI koszt jest liczony lokalnie z `config.json`; po zmianie modelu albo cen
   trzeba zaktualizować sekcję `pricing`.
-- W repo nie ma realnego zestawu testów. `npm test` jest placeholderem i kończy
-  się błędem.
+- `npm test` uruchamia testy Node.js, w tym testy filtrowania załączników i
+  metadanych galerii.
