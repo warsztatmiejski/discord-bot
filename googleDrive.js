@@ -28,6 +28,18 @@ const oAuth2Client = new google.auth.OAuth2(
 // Shared Drive ID from .env
 const SHARED_DRIVE_ID = process.env.SHARED_DRIVE_ID; // Moved to .env
 
+function normalizeDriveProperties(properties = {}) {
+	return Object.fromEntries(
+		Object.entries(properties)
+			.filter(([, value]) => value !== undefined && value !== null)
+			.map(([key, value]) => [key, String(value)])
+	);
+}
+
+function escapeDriveQueryValue(value) {
+	return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 // Function to authorize the client
 async function authorizeGoogleDrive() {
 	return new Promise((resolve, reject) => {
@@ -130,8 +142,54 @@ async function createFolderInDrive(authClient, folderName) {
 	return res.data; // Contains id, name, and webViewLink
 }
 
+async function getOrCreateFolderInDrive(authClient, folderName) {
+	const drive = google.drive({ version: 'v3', auth: authClient });
+	const safeDriveId = escapeDriveQueryValue(SHARED_DRIVE_ID);
+	const safeFolderName = escapeDriveQueryValue(folderName);
+	const res = await drive.files.list({
+		q: `'${safeDriveId}' in parents and name = '${safeFolderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+		fields: 'files(id, name, webViewLink)',
+		pageSize: 1,
+		supportsAllDrives: true,
+		includeItemsFromAllDrives: true,
+		corpora: 'drive',
+		driveId: SHARED_DRIVE_ID,
+	});
+	const existingFolder = res.data.files[0];
+
+	return existingFolder || createFolderInDrive(authClient, folderName);
+}
+
+async function findFileByPropertyInFolder(authClient, folderId, propertyKey, propertyValue) {
+	const drive = google.drive({ version: 'v3', auth: authClient });
+	const safeFolderId = escapeDriveQueryValue(folderId);
+	const safeKey = escapeDriveQueryValue(propertyKey);
+	const safeValue = escapeDriveQueryValue(propertyValue);
+
+	const res = await drive.files.list({
+		q: `'${safeFolderId}' in parents and properties has { key='${safeKey}' and value='${safeValue}' } and trashed = false`,
+		fields: 'files(id, name, webViewLink, properties)',
+		pageSize: 1,
+		supportsAllDrives: true,
+		includeItemsFromAllDrives: true,
+		corpora: 'drive',
+		driveId: SHARED_DRIVE_ID,
+	});
+
+	return res.data.files[0] || null;
+}
+
 // Function to upload a file to the specified folder in the shared drive
-async function uploadFileToGoogleDrive(authClient, mediaUrl, fileName, folderId, mimeType, displayName, username) {
+async function uploadFileToGoogleDrive(
+	authClient,
+	mediaUrl,
+	fileName,
+	folderId,
+	mimeType,
+	displayName,
+	username,
+	additionalMetadata = {}
+) {
 	const drive = google.drive({ version: 'v3', auth: authClient });
 
 	// Download the media as a stream
@@ -144,11 +202,14 @@ async function uploadFileToGoogleDrive(authClient, mediaUrl, fileName, folderId,
 	const fileMetadata = {
 		name: fileName,
 		parents: [folderId],
-		description: `Autor: ${displayName} (@${username} na Discord)`,
-		properties: {
+		description:
+			additionalMetadata.description ||
+			`Autor: ${displayName} (@${username} na Discord)`,
+		properties: normalizeDriveProperties({
 			uploadedBy: displayName,
 			username: username,
-		},
+			...additionalMetadata.properties,
+		}),
 	};
 
 	const media = {
@@ -187,5 +248,7 @@ module.exports = {
 	uploadFileToGoogleDrive,
 	listFoldersInDrive,
 	createFolderInDrive,
+	getOrCreateFolderInDrive,
+	findFileByPropertyInFolder,
 	getFolderInfoById,
 };

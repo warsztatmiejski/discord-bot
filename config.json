@@ -7,6 +7,10 @@
 		"trustee": "1198387357997600901",
 		"premium": "1198384916497453176"
 	},
+	"gallery": {
+		"emojiName": "gallery",
+		"folderName": "Galeria"
+	},
 	"calendarChannelId": "1205993386230808637",
 
 	"memoryTurns": 3,
