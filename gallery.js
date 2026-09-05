@@ -1,19 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 
+const galleryApi = require('./gallery-api');
+const galleryState = require('./gallery-state');
 const {
-	authorizeGoogleDrive,
-	findFileByPropertyInFolder,
-	getOrCreateFolderInDrive,
-	uploadFileToGoogleDrive,
-} = require('./googleDrive');
-const {
-	buildGalleryMetadata,
+	buildYoutubeMetadata,
+	buildVideoReservation,
+	getMediaKind,
 	isSupportedMediaAttachment,
 } = require('./gallery-utils');
+const youtube = require('./youtube');
 
 const CONFIG_PATH = path.resolve(__dirname, 'config.json');
-const processingMessageIds = new Set();
 
 function getGalleryConfig() {
 	const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
@@ -21,96 +19,260 @@ function getGalleryConfig() {
 	return {
 		trusteeRoleId: config?.roleIds?.trustee || null,
 		emojiName: config?.gallery?.emojiName || 'gallery',
-		folderName: config?.gallery?.folderName || 'Galeria',
 	};
 }
 
-async function removeGalleryReaction(reaction, userId) {
+async function removeGalleryReaction(reaction, userId, logger = console) {
 	try {
 		await reaction.users.remove(userId);
 	} catch (error) {
-		console.error('Could not remove failed gallery reaction:', error);
+		logger.error('Could not remove failed gallery reaction:', error);
 	}
 }
 
-async function handleGalleryReaction(reaction, user) {
-	if (user.bot) return;
-
-	let galleryConfig;
+async function sendMessage(message, content, logger = console) {
 	try {
-		galleryConfig = getGalleryConfig();
+		return await message.reply({ content });
 	} catch (error) {
-		console.error('Could not read gallery configuration:', error);
-		return;
+		logger.error('Could not send gallery status message:', error);
+		return null;
+	}
+}
+
+async function updateMessage(statusMessage, content, logger = console) {
+	if (!statusMessage) return;
+	try {
+		await statusMessage.edit({ content });
+	} catch (error) {
+		logger.error('Could not update gallery status message:', error);
+	}
+}
+
+async function bestEffortSubmissionUpdate(api, submissionId, payload, logger) {
+	if (!submissionId) return;
+	try {
+		await api.updateVideo(submissionId, payload);
+	} catch (error) {
+		logger.error(`Could not update gallery submission ${submissionId}:`, error);
+	}
+}
+
+function createGalleryReactionHandler({
+	api = galleryApi,
+	state = galleryState,
+	youtubeClient = youtube,
+	configProvider = getGalleryConfig,
+	logger = console,
+} = {}) {
+	const processingMessageIds = new Set();
+
+	async function processImage(message, attachment) {
+		const result = await api.ingestImage(message, attachment);
+
+		return {
+			kind: 'image',
+			existing: Boolean(result.suppressed),
+			suppressed: Boolean(result.suppressed),
+			url: result.item?.url || null,
+		};
 	}
 
-	if (reaction.emoji.name !== galleryConfig.emojiName) return;
+	async function processVideo(message, attachment) {
+		const payload = buildVideoReservation(message, attachment);
+		const idempotencyKey = `discord:${message.id}:${attachment.id}`;
+		const reservation = await api.reserveVideo(payload, idempotencyKey);
 
-	let message = reaction.message;
-	try {
-		if (reaction.partial) await reaction.fetch();
-		if (message.partial) message = await message.fetch();
-		if (!message.guild || !galleryConfig.trusteeRoleId) return;
+		if (reservation.status === 'published' && reservation.providerId) {
+			return {
+				kind: 'youtube_video',
+				existing: true,
+				url: reservation.url || `https://www.youtube.com/watch?v=${reservation.providerId}`,
+			};
+		}
 
-		const reactingMember = await message.guild.members.fetch(user.id);
-		if (!reactingMember.roles.cache.has(galleryConfig.trusteeRoleId)) return;
+		const submissionId = reservation.submissionId;
+		if (!submissionId) throw new Error('Gallery API did not return a submission ID for a video');
 
-		const mediaAttachments = message.attachments.filter(isSupportedMediaAttachment);
-		if (mediaAttachments.size === 0) return;
+		let savedVideo = await state.getVideo(attachment.id);
+		await state.updateVideo(attachment.id, { submissionId, idempotencyKey });
+		await api.updateVideo(submissionId, { status: 'uploading' });
 
-		const processingKey = `${message.guild.id}:${message.id}`;
-		if (processingMessageIds.has(processingKey)) return;
-		processingMessageIds.add(processingKey);
-
+		let failureCode = 'youtube_upload_failed';
 		try {
-			const authClient = await authorizeGoogleDrive();
-			const galleryFolder = await getOrCreateFolderInDrive(
-				authClient,
-				galleryConfig.folderName
-			);
-
-			let uploadedCount = 0;
-			let existingCount = 0;
-
-			for (const attachment of mediaAttachments.values()) {
-				const existingFile = await findFileByPropertyInFolder(
-					authClient,
-					galleryFolder.id,
-					'discordAttachmentId',
-					attachment.id
+			if (!savedVideo?.youtubeVideoId) {
+				const uploadedVideo = await youtubeClient.uploadDiscordVideo({
+					mediaUrl: attachment.url,
+					mimeType: attachment.contentType,
+					size: attachment.size,
+					metadata: buildYoutubeMetadata(message, attachment),
+				});
+				savedVideo = await state.updateVideo(attachment.id, {
+					youtubeVideoId: uploadedVideo.id,
+					status: 'uploaded',
+				});
+				await bestEffortSubmissionUpdate(
+					api,
+					submissionId,
+					{ status: 'uploaded' },
+					logger
 				);
-
-				if (existingFile) {
-					existingCount += 1;
-					continue;
-				}
-
-				const metadata = buildGalleryMetadata(message, attachment);
-				await uploadFileToGoogleDrive(
-					authClient,
-					attachment.url,
-					attachment.name || `discord-${attachment.id}`,
-					galleryFolder.id,
-					attachment.contentType || 'application/octet-stream',
-					metadata.displayName,
-					metadata.username,
-					metadata
-				);
-				uploadedCount += 1;
 			}
 
-			console.log(
-				`[gallery] message ${message.id}: uploaded ${uploadedCount}, already present ${existingCount}`
+			failureCode = 'youtube_processing_failed';
+			if (!savedVideo.readyAt) {
+				await youtubeClient.waitForVideoReady(savedVideo.youtubeVideoId);
+				savedVideo = await state.updateVideo(attachment.id, {
+					readyAt: new Date().toISOString(),
+					status: 'processed',
+				});
+			}
+
+			failureCode = 'youtube_playlist_failed';
+			if (!savedVideo.playlistItemId) {
+				const playlist = await youtubeClient.addVideoToPlaylist(savedVideo.youtubeVideoId);
+				savedVideo = await state.updateVideo(attachment.id, {
+					...playlist,
+					status: 'playlist_added',
+				});
+				await bestEffortSubmissionUpdate(
+					api,
+					submissionId,
+					{ status: 'playlist_added' },
+					logger
+				);
+			}
+
+			failureCode = 'gallery_finalize_failed';
+			const url = `https://www.youtube.com/watch?v=${savedVideo.youtubeVideoId}`;
+			await api.updateVideo(submissionId, {
+				status: 'published',
+				provider: 'youtube',
+				providerId: savedVideo.youtubeVideoId,
+				url,
+				playlistId: savedVideo.playlistId,
+				playlistItemId: savedVideo.playlistItemId,
+				title: buildYoutubeMetadata(message, attachment).title,
+			});
+			try {
+				await state.updateVideo(attachment.id, { status: 'published' });
+			} catch (error) {
+				logger.error(`Could not persist published state for ${attachment.id}:`, error);
+			}
+
+			return { kind: 'youtube_video', existing: false, url };
+		} catch (error) {
+			await bestEffortSubmissionUpdate(
+				api,
+				submissionId,
+				{ status: 'failed', errorCode: failureCode },
+				logger
 			);
-		} finally {
-			processingMessageIds.delete(processingKey);
+			await state.updateVideo(attachment.id, {
+				status: 'failed',
+				failureCode,
+			});
+			throw error;
 		}
-	} catch (error) {
-		console.error('Gallery upload failed:', error);
-		await removeGalleryReaction(reaction, user.id);
 	}
+
+	return async function handleGalleryReaction(reaction, user) {
+		if (user.bot) return;
+
+		let galleryConfig;
+		try {
+			galleryConfig = configProvider();
+		} catch (error) {
+			logger.error('Could not read gallery configuration:', error);
+			return;
+		}
+
+		if (reaction.emoji.name !== galleryConfig.emojiName) return;
+
+		let message = reaction.message;
+		try {
+			if (reaction.partial) {
+				await reaction.fetch();
+				message = reaction.message;
+			}
+			if (message.partial) message = await message.fetch();
+			if (!message.guild || !galleryConfig.trusteeRoleId) return;
+
+			const reactingMember = await message.guild.members.fetch(user.id);
+			if (!reactingMember.roles.cache.has(galleryConfig.trusteeRoleId)) return;
+
+			const mediaAttachments = message.attachments.filter(isSupportedMediaAttachment);
+			if (mediaAttachments.size === 0) return;
+
+			const processingKey = `${message.guild.id}:${message.id}`;
+			if (processingMessageIds.has(processingKey)) return;
+			processingMessageIds.add(processingKey);
+
+			const videoCount = mediaAttachments.filter(
+				(attachment) => getMediaKind(attachment) === 'youtube_video'
+			).size;
+			const statusMessage = videoCount
+				? await sendMessage(
+						message,
+						`🎬 Przesyłam ${videoCount === 1 ? 'film' : `${videoCount} filmy`} do YouTube…`,
+						logger
+					)
+				: null;
+			const successes = [];
+			const failures = [];
+
+			try {
+				for (const attachment of mediaAttachments.values()) {
+					try {
+						const kind = getMediaKind(attachment);
+						const result = kind === 'image'
+							? await processImage(message, attachment)
+							: await processVideo(message, attachment);
+						successes.push({ attachment, ...result });
+					} catch (error) {
+						failures.push({ attachment, error });
+						logger.error(`[gallery] attachment ${attachment.id} failed:`, error);
+					}
+				}
+
+				const videoLinks = successes
+					.filter((result) => result.kind === 'youtube_video' && result.url)
+					.map((result) => result.url);
+				const imageCount = successes.filter((result) => result.kind === 'image').length;
+				const parts = [];
+				if (imageCount) parts.push(`zdjęcia: ${imageCount}`);
+				if (videoLinks.length) parts.push(`filmy: ${videoLinks.join(', ')}`);
+
+				if (successes.length > 0) {
+					const failureNote = failures.length
+						? ` Nie udało się dodać ${failures.length} ${failures.length === 1 ? 'pliku' : 'plików'}.`
+						: '';
+					const summary = `✅ Dodano do galerii${parts.length ? ` (${parts.join('; ')})` : ''}.${failureNote}`;
+					if (statusMessage) await updateMessage(statusMessage, summary, logger);
+					else if (failures.length) await sendMessage(message, summary, logger);
+				} else {
+					await removeGalleryReaction(reaction, user.id, logger);
+					const failureMessage = '❌ Nie udało się dodać mediów do galerii. Reakcję usunięto — spróbuj ponownie później.';
+					if (statusMessage) await updateMessage(statusMessage, failureMessage, logger);
+					else await sendMessage(message, failureMessage, logger);
+				}
+
+				logger.log(
+					`[gallery] message ${message.id}: succeeded ${successes.length}, failed ${failures.length}`
+				);
+			} finally {
+				processingMessageIds.delete(processingKey);
+			}
+		} catch (error) {
+			logger.error('Gallery reaction handling failed:', error);
+			await removeGalleryReaction(reaction, user.id, logger);
+		}
+	};
 }
 
+const handleGalleryReaction = createGalleryReactionHandler();
+
 module.exports = {
+	createGalleryReactionHandler,
+	getGalleryConfig,
 	handleGalleryReaction,
 };
