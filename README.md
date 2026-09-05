@@ -1,8 +1,8 @@
 # Św. MacGyver – Bot Warsztatu Miejskiego na Discord
 
 Bot Discord dla społeczności Warsztatu Miejskiego. Obsługuje automatyzacje
-serwerowe, asystenta AI, powiadomienia o mailach z Gmaila oraz zapisywanie
-mediów z Discorda na Google Drive.
+serwerowe, asystenta AI, powiadomienia o mailach z Gmaila oraz publikowanie
+mediów z Discorda na Google Drive i w galerii internetowej.
 
 ## Najważniejsze funkcje
 
@@ -24,9 +24,9 @@ mediów z Discorda na Google Drive.
 - Obsługa mediów w wybranym kanale: użytkownik wybiera folder Google Drive albo
   tworzy nowy, a bot zapisuje obrazy/wideo z metadanymi autora.
 - Upload do galerii przez reakcję: użytkownik z rolą `trustee` dodaje do
-  wiadomości niestandardową reakcję `:gallery:`, a bot zapisuje jej obrazy i
-  filmy w folderze `Galeria` na Google Drive. Ponowne użycie reakcji nie tworzy
-  duplikatów tych samych załączników.
+  wiadomości niestandardową reakcję `:gallery:`. Obrazy trafiają przez API
+  strony do Cloudflare R2, a filmy na kanał YouTube i do wskazanej playlisty.
+  Ponowne użycie reakcji nie tworzy duplikatów tych samych załączników.
 - Sprawdzanie konta obsługi faktur na Gmailu automatycznie po starcie
   oraz codziennie o 09:00, 13:00 i 17:00 czasu serwera, plus ręcznie przez
   `/faktury`.
@@ -36,7 +36,7 @@ mediów z Discorda na Google Drive.
 - Node.js, CommonJS.
 - `discord.js` v14.
 - OpenAI Responses API przez pakiet `openai`.
-- Google APIs: Drive v3 i Gmail v1.
+- Google APIs: Drive v3, Gmail v1 i YouTube Data API v3.
 - `dotenv` do ładowania konfiguracji z `.env`.
 
 Zalecana wersja Node.js: 18 lub nowsza.
@@ -51,9 +51,15 @@ Zalecana wersja Node.js: 18 lub nowsza.
   wstrzykiwana do promptu zależnie od pytania.
 - `media.js` i `googleDrive.js` - interaktywny workflow uploadu mediów do
   Google Drive oraz wspólne operacje na plikach i folderach Drive.
-- `gallery.js` - obsługa reakcji `:gallery:` i upload załączników do galerii.
+- `gallery.js` - obsługa reakcji `:gallery:` i koordynacja publikacji w galerii.
+- `gallery-api.js` - uwierzytelniona komunikacja z API strony galerii.
+- `gallery-state.js` - trwały stan uploadów YouTube chroniący przed duplikatami
+  po restarcie lub przejściowej awarii API strony.
 - `gallery-utils.js` - filtrowanie obsługiwanych załączników i budowanie ich
   metadanych Discorda; testy znajdują się w `gallery-utils.test.js`.
+- `youtube.js` - OAuth, wznawialny upload filmów i dodawanie ich do playlisty.
+- `GALLERY_API.md` - kontrakt endpointów, payloadów i stanów wymaganych po
+  stronie serwisu internetowego.
 - `gmail.js` i `email-checker.js` - autoryzacja Gmaila i powiadomienia o nowych
   nieprzeczytanych mailach.
 - `keywords.js` - reakcje na słowa kluczowe.
@@ -74,6 +80,24 @@ WELCOME_CHANNEL_ID=discord_channel_id
 MEDIA_CHANNEL_ID=discord_channel_id
 FAKTURY_CHANNEL_ID=discord_channel_id
 SHARED_DRIVE_ID=google_shared_drive_or_folder_id
+GALLERY_API_BASE_URL=https://warsztatmiejski.org
+GALLERY_DISCORD_INGEST_SECRET=strong_shared_service_token
+GALLERY_MAX_IMAGE_BYTES=20000000
+GALLERY_MAX_DISCORD_VIDEO_BYTES=20000000
+# GALLERY_API_TIMEOUT_MS=120000
+YOUTUBE_CHANNEL_ID=expected_youtube_channel_id
+YOUTUBE_PLAYLIST_ID=gallery_playlist_id
+
+# Opcjonalne ustawienia uploadu YouTube.
+# YOUTUBE_CREDENTIALS_PATH=/secure/path/credentials_youtube.json
+# YOUTUBE_TOKEN_PATH=/secure/path/token_youtube.json
+# YOUTUBE_REDIRECT_URI=http://localhost:3000/oauth2callback
+YOUTUBE_PRIVACY_STATUS=unlisted
+YOUTUBE_CATEGORY_ID=22
+YOUTUBE_NOTIFY_SUBSCRIBERS=false
+# YOUTUBE_MADE_FOR_KIDS=false
+YOUTUBE_PROCESSING_TIMEOUT_MS=600000
+# GALLERY_STATE_PATH=/persistent/path/gallery-upload-state.json
 
 # Tylko tymczasowo przy pierwszej autoryzacji Gmaila.
 GMAIL_AUTH_CODE=oauth_code_from_google_redirect
@@ -92,18 +116,50 @@ Znaczenie zmiennych:
 - `FAKTURY_CHANNEL_ID` - kanał powiadomień o nowych mailach fakturowych.
 - `SHARED_DRIVE_ID` - ID folderu/dysku Google Drive, w którym bot listuje i
   tworzy foldery dla mediów.
+- `GALLERY_API_BASE_URL` - adres strony; domyślnie `https://warsztatmiejski.org`.
+- `GALLERY_DISCORD_INGEST_SECRET` - sekret Bearer współdzielony wyłącznie
+  przez bota i API strony; musi odpowiadać zmiennej o tej samej nazwie na stronie.
+- `GALLERY_MAX_IMAGE_BYTES` - lokalny limit obrazu odpowiadający limitowi strony;
+  domyślnie 20 MB.
+- `GALLERY_MAX_DISCORD_VIDEO_BYTES` - limit filmu po obu stronach; domyślnie
+  20 MB.
+- `GALLERY_API_TIMEOUT_MS` - limit czasu pobrania i przekazania obrazu albo
+  wywołania JSON; domyślnie 120 sekund.
+- `YOUTUBE_CHANNEL_ID` - oczekiwany kanał. Bot odmawia uploadu, jeśli token OAuth
+  został wystawiony dla innego kanału.
+- `YOUTUBE_PLAYLIST_ID` - zwykła playlista, do której bot dodaje nowe filmy.
+- `YOUTUBE_CREDENTIALS_PATH` - opcjonalna ścieżka do osobnego klienta OAuth dla
+  YouTube; domyślnie wspólny `credentials.json` w katalogu bota.
+- `YOUTUBE_TOKEN_PATH` - opcjonalna trwała lokalizacja tokenu YouTube; domyślnie
+  `token_youtube.json` w katalogu bota.
+- `YOUTUBE_REDIRECT_URI` - redirect URI klienta OAuth; domyślnie
+  `http://localhost:3000/oauth2callback` i musi dokładnie odpowiadać wpisowi w
+  Google Cloud Console.
+- `YOUTUBE_PRIVACY_STATUS` - domyślnie `unlisted`.
+- `YOUTUBE_CATEGORY_ID` - domyślnie `22` (`People & Blogs`).
+- `YOUTUBE_NOTIFY_SUBSCRIBERS` - domyślnie `false`.
+- `YOUTUBE_MADE_FOR_KIDS` - opcjonalne jawne ustawienie odbiorców filmu. Gdy
+  zmienna nie istnieje, bot nie wysyła tego pola i obowiązują ustawienia kanału.
+- `YOUTUBE_PROCESSING_TIMEOUT_MS` - jak długo bot czeka na zakończenie
+  przetwarzania filmu przed publikacją rekordu strony; domyślnie 10 minut.
+- `GALLERY_STATE_PATH` - opcjonalna trwała lokalizacja stanu uploadów; domyślnie
+  `gallery-upload-state.json` w katalogu bota.
 - `GMAIL_AUTH_CODE` - jednorazowy kod OAuth do wygenerowania `token_gmail.json`.
   Po poprawnej autoryzacji usuń tę zmienną z `.env`.
 
 ## Pliki Google OAuth
 
-Integracje Google wymagają lokalnego pliku `credentials.json` z OAuth Client ID.
-Plik nie jest częścią repozytorium i powinien pochodzić z Google Cloud Console.
+Integracje Google wymagają pliku z OAuth Client ID pobranego z Google Cloud
+Console. Drive i Gmail domyślnie korzystają z lokalnego `credentials.json`.
+YouTube może korzystać z osobnego klienta wskazanego przez
+`YOUTUBE_CREDENTIALS_PATH`, co jest zalecane, gdy uploader ma osobny projekt
+Google Cloud objęty audytem YouTube.
 
 W Google Cloud należy włączyć:
 
 - Google Drive API dla uploadu mediów.
 - Gmail API dla sprawdzania nieprzeczytanych maili.
+- YouTube Data API v3 dla uploadu filmów i zarządzania playlistą.
 
 OAuth client musi mieć redirect URI:
 
@@ -116,11 +172,19 @@ Tokeny generowane lokalnie:
 - `token_drive.json` - token Google Drive, generowany automatycznie przy pierwszym
   użyciu uploadu mediów.
 - `token_gmail.json` - token Gmaila, generowany po podaniu `GMAIL_AUTH_CODE`.
+- `token_youtube.json` - oddzielny token YouTube z uprawnieniami do uploadu i
+  zarządzania playlistą; jest generowany przy pierwszym filmie galeryjnym.
 - `token.json` - starszy token Google Photos, używany tylko przez
   `googlePhotos.js`, który obecnie nie jest podpięty w głównym flow bota.
 
 Tych plików nie należy commitować. Jeżeli przenosisz bota na inny serwer, skopiuj
 je bezpiecznym kanałem albo wykonaj autoryzację ponownie.
+
+Nowe projekty YouTube API bez audytu ograniczają uploady API do widoczności
+prywatnej, nawet gdy bot prosi o `unlisted`. Przed produkcyjnym uruchomieniem
+galerii projekt Google Cloud musi przejść wymagany audyt YouTube. Zewnętrzna
+aplikacja OAuth pozostawiona w trybie `Testing` wydaje ponadto token odświeżania
+ważny tylko 7 dni; konfiguracja produkcyjna nie może pozostać w tym trybie.
 
 ## Konfiguracja Discorda
 
@@ -165,8 +229,6 @@ są sekretami:
   limitów AI.
 - `gallery.emojiName` - nazwa niestandardowego emoji uruchamiającego upload do
   galerii; domyślnie `gallery` (bez dwukropków).
-- `gallery.folderName` - nazwa folderu galerii na Google Drive; domyślnie
-  `Galeria`. Bot utworzy ten folder, jeśli jeszcze nie istnieje.
 - `calendarChannelId` - kanał kalendarza linkowany w odpowiedziach o wydarzeniach.
 - `memoryTurns` - liczba tur rozmowy pamiętanych per kanał w pamięci procesu.
 - `dailyBudgetUSD` - globalny dzienny limit kosztów AI.
@@ -199,8 +261,18 @@ node deploy-commands.js
 npm start
 ```
 
-Przy pierwszym użyciu Google Drive bot otworzy URL autoryzacyjny i nasłuchuje
-callbacku na `localhost:3000`. Przy pierwszym użyciu Gmaila `gmail.js` wypisze w
+Autoryzację YouTube można przygotować przed uruchomieniem bota:
+
+```bash
+npm run youtube:auth
+```
+
+Przy pierwszym użyciu Google Drive lub YouTube bot otworzy URL autoryzacyjny i
+nasłuchuje callbacku na `localhost:3000`. Dla YouTube należy zalogować się jako
+osoba zarządzająca kanałem wskazanym przez `YOUTUBE_CHANNEL_ID`. Na serwerze bez
+przeglądarki wygeneruj `token_youtube.json` lokalnie z tym samym `credentials.json`,
+a następnie skopiuj token bezpiecznym kanałem. Przy pierwszym użyciu Gmaila
+`gmail.js` wypisze w
 logach ręczną instrukcję: wejdź w URL, zaloguj się jako konto fakturowe, skopiuj
 parametr `code`, wpisz go jako `GMAIL_AUTH_CODE` w `.env` i zrestartuj bota. Po
 utworzeniu `token_gmail.json` usuń `GMAIL_AUTH_CODE`.
@@ -229,7 +301,10 @@ wygenerowane tokeny Google albo możliwość wykonania autoryzacji od nowa.
 - `cost-tracker.json` - dzienne koszty AI per użytkownik i globalnie.
 - `last_email_check.json` - ostatnio przetworzone ID maili, żeby nie wysyłać
   duplikatów powiadomień.
-- `token_drive.json`, `token_gmail.json`, `token.json` - tokeny OAuth Google.
+- `token_drive.json`, `token_gmail.json`, `token_youtube.json`, `token.json` -
+  tokeny OAuth Google.
+- `gallery-upload-state.json` - lokalne mapowanie Discord attachment ID na ID
+  filmu i elementu playlisty YouTube. Plik należy zachować przy migracji bota.
 - `config.json` - część ustawień może być zmieniana przez komendy bota.
 
 Te pliki wpływają na zachowanie działającej instancji. Przed restartem lub
@@ -256,14 +331,18 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
 2. Użytkownik z rolą określoną w `roleIds.trustee` dodaje do wiadomości
    niestandardową reakcję określoną przez `gallery.emojiName` (domyślnie
    `:gallery:`).
-3. Bot tworzy lub odnajduje folder `gallery.folderName` na Google Drive i
-   zapisuje w nim obsługiwane załączniki wraz z informacjami o autorze, kanale i
-   wiadomości źródłowej.
-4. Każdy załącznik jest identyfikowany przez Discord attachment ID, więc kolejne
+3. Dla obrazu bot wywołuje API strony, które pobiera tymczasowy załącznik
+   Discorda, zapisuje go w R2 i publikuje rekord galerii.
+4. Dla filmu bot rezerwuje rekord strony, pokazuje na Discordzie status uploadu,
+   wykonuje wznawialny upload do YouTube, dodaje film do skonfigurowanej playlisty
+   i finalizuje rekord strony linkiem YouTube.
+5. Każdy załącznik jest identyfikowany przez Discord attachment ID, więc kolejne
    reakcje nie powodują ponownego uploadu tego samego pliku.
 
-Jeśli upload się nie powiedzie, bot usuwa reakcję użytkownika, sygnalizując, że
-operację można ponowić po usunięciu przyczyny błędu.
+Jeśli wszystkie załączniki zawiodą, bot usuwa reakcję użytkownika i odpowiada
+komunikatem o błędzie. Przy wiadomości mieszanej pozostawia reakcję, publikuje
+poprawne elementy i podaje liczbę błędów. Lokalny stan pozwala po ponowieniu
+dokończyć playlistę lub API strony bez drugiego uploadu filmu do YouTube.
 
 ## Uwagi utrzymaniowe
 
@@ -274,5 +353,5 @@ operację można ponowić po usunięciu przyczyny błędu.
   przeczytane. Duplikaty są ograniczane przez `last_email_check.json`.
 - OpenAI koszt jest liczony lokalnie z `config.json`; po zmianie modelu albo cen
   trzeba zaktualizować sekcję `pricing`.
-- `npm test` uruchamia testy Node.js, w tym testy filtrowania załączników i
-  metadanych galerii.
+- `npm test` uruchamia testy Node.js dla filtrowania załączników, kontraktu API
+  strony, trwałego stanu, koordynacji reakcji oraz pomocniczej logiki YouTube.

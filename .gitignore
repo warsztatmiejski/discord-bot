@@ -6,10 +6,13 @@ node_modules/
 
 # Ignore credentials
 credentials.json
+credentials_youtube.json
 token.json
 token_drive.json
 token_gmail.json
+token_youtube.json
 last_email_check.json
+gallery-upload-state.json
 
 # nova
 .nova
