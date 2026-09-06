@@ -25,8 +25,10 @@ function getGalleryConfig() {
 async function removeGalleryReaction(reaction, userId, logger = console) {
 	try {
 		await reaction.users.remove(userId);
+		return true;
 	} catch (error) {
 		logger.error('Could not remove failed gallery reaction:', error);
+		return false;
 	}
 }
 
@@ -36,15 +38,6 @@ async function sendMessage(message, content, logger = console) {
 	} catch (error) {
 		logger.error('Could not send gallery status message:', error);
 		return null;
-	}
-}
-
-async function updateMessage(statusMessage, content, logger = console) {
-	if (!statusMessage) return;
-	try {
-		await statusMessage.edit({ content });
-	} catch (error) {
-		logger.error('Could not update gallery status message:', error);
 	}
 }
 
@@ -207,16 +200,6 @@ function createGalleryReactionHandler({
 			if (processingMessageIds.has(processingKey)) return;
 			processingMessageIds.add(processingKey);
 
-			const videoCount = mediaAttachments.filter(
-				(attachment) => getMediaKind(attachment) === 'youtube_video'
-			).size;
-			const statusMessage = videoCount
-				? await sendMessage(
-						message,
-						`🎬 Przesyłam ${videoCount === 1 ? 'film' : `${videoCount} filmy`} do YouTube…`,
-						logger
-					)
-				: null;
 			const successes = [];
 			const failures = [];
 
@@ -234,26 +217,15 @@ function createGalleryReactionHandler({
 					}
 				}
 
-				const videoLinks = successes
-					.filter((result) => result.kind === 'youtube_video' && result.url)
-					.map((result) => result.url);
-				const imageCount = successes.filter((result) => result.kind === 'image').length;
-				const parts = [];
-				if (imageCount) parts.push(`zdjęcia: ${imageCount}`);
-				if (videoLinks.length) parts.push(`filmy: ${videoLinks.join(', ')}`);
-
-				if (successes.length > 0) {
-					const failureNote = failures.length
-						? ` Nie udało się dodać ${failures.length} ${failures.length === 1 ? 'pliku' : 'plików'}.`
-						: '';
-					const summary = `✅ Dodano do galerii${parts.length ? ` (${parts.join('; ')})` : ''}.${failureNote}`;
-					if (statusMessage) await updateMessage(statusMessage, summary, logger);
-					else if (failures.length) await sendMessage(message, summary, logger);
-				} else {
-					await removeGalleryReaction(reaction, user.id, logger);
-					const failureMessage = '❌ Nie udało się dodać mediów do galerii. Reakcję usunięto — spróbuj ponownie później.';
-					if (statusMessage) await updateMessage(statusMessage, failureMessage, logger);
-					else await sendMessage(message, failureMessage, logger);
+				if (failures.length > 0) {
+					const reactionRemoved = await removeGalleryReaction(reaction, user.id, logger);
+					const scope = successes.length > 0
+						? `Nie udało się dodać ${failures.length} ${failures.length === 1 ? 'pliku' : 'plików'} do galerii.`
+						: 'Nie udało się dodać mediów do galerii.';
+					const retry = reactionRemoved
+						? 'Reakcję usunięto — spróbuj ponownie później.'
+						: 'Nie udało się usunąć reakcji — usuń ją ręcznie przed ponowną próbą.';
+					await sendMessage(message, `❌ ${scope} ${retry}`, logger);
 				}
 
 				logger.log(
@@ -264,7 +236,11 @@ function createGalleryReactionHandler({
 			}
 		} catch (error) {
 			logger.error('Gallery reaction handling failed:', error);
-			await removeGalleryReaction(reaction, user.id, logger);
+			const reactionRemoved = await removeGalleryReaction(reaction, user.id, logger);
+			const retry = reactionRemoved
+				? 'Reakcję usunięto — spróbuj ponownie później.'
+				: 'Nie udało się usunąć reakcji — usuń ją ręcznie przed ponowną próbą.';
+			await sendMessage(message, `❌ Nie udało się dodać mediów do galerii. ${retry}`, logger);
 		}
 	};
 }

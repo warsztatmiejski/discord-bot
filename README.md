@@ -85,6 +85,10 @@ GALLERY_DISCORD_INGEST_SECRET=strong_shared_service_token
 GALLERY_MAX_IMAGE_BYTES=20000000
 GALLERY_MAX_DISCORD_VIDEO_BYTES=20000000
 # GALLERY_API_TIMEOUT_MS=120000
+# GALLERY_IMAGE_DOWNLOAD_TIMEOUT_MS=120000
+# GALLERY_IMAGE_UPLOAD_TIMEOUT_MS=120000
+# GALLERY_API_RETRY_COUNT=2
+# GALLERY_API_RETRY_DELAY_MS=500
 YOUTUBE_CHANNEL_ID=expected_youtube_channel_id
 YOUTUBE_PLAYLIST_ID=gallery_playlist_id
 
@@ -123,8 +127,15 @@ Znaczenie zmiennych:
   domyślnie 20 MB.
 - `GALLERY_MAX_DISCORD_VIDEO_BYTES` - limit filmu po obu stronach; domyślnie
   20 MB.
-- `GALLERY_API_TIMEOUT_MS` - limit czasu pobrania i przekazania obrazu albo
-  wywołania JSON; domyślnie 120 sekund.
+- `GALLERY_API_TIMEOUT_MS` - domyślny limit czasu wywołań API galerii i wartość
+  zapasowa dla obu etapów obsługi obrazu; domyślnie 120 sekund.
+- `GALLERY_IMAGE_DOWNLOAD_TIMEOUT_MS` i `GALLERY_IMAGE_UPLOAD_TIMEOUT_MS` -
+  niezależne limity pobrania obrazu z Discorda i wysłania gotowego multipart do
+  strony.
+- `GALLERY_API_RETRY_COUNT` - liczba ponowień po przejściowym błędzie połączenia
+  albo HTTP 502/503/504; domyślnie 2 (łącznie najwyżej 3 próby).
+- `GALLERY_API_RETRY_DELAY_MS` - początkowe opóźnienie ponowienia; domyślnie
+  500 ms i podwaja się przy każdej kolejnej próbie.
 - `YOUTUBE_CHANNEL_ID` - oczekiwany kanał. Bot odmawia uploadu, jeśli token OAuth
   został wystawiony dla innego kanału.
 - `YOUTUBE_PLAYLIST_ID` - zwykła playlista, do której bot dodaje nowe filmy.
@@ -333,16 +344,18 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
    `:gallery:`).
 3. Dla obrazu bot wywołuje API strony, które pobiera tymczasowy załącznik
    Discorda, zapisuje go w R2 i publikuje rekord galerii.
-4. Dla filmu bot rezerwuje rekord strony, pokazuje na Discordzie status uploadu,
-   wykonuje wznawialny upload do YouTube, dodaje film do skonfigurowanej playlisty
-   i finalizuje rekord strony linkiem YouTube.
+4. Dla filmu bot rezerwuje rekord strony, wykonuje wznawialny upload do YouTube,
+   dodaje film do skonfigurowanej playlisty i finalizuje rekord strony linkiem
+   YouTube. Pomyślne przetwarzanie zdjęć i filmów nie publikuje wiadomości na
+   Discordzie.
 5. Każdy załącznik jest identyfikowany przez Discord attachment ID, więc kolejne
    reakcje nie powodują ponownego uploadu tego samego pliku.
 
-Jeśli wszystkie załączniki zawiodą, bot usuwa reakcję użytkownika i odpowiada
-komunikatem o błędzie. Przy wiadomości mieszanej pozostawia reakcję, publikuje
-poprawne elementy i podaje liczbę błędów. Lokalny stan pozwala po ponowieniu
-dokończyć playlistę lub API strony bez drugiego uploadu filmu do YouTube.
+Jeśli którykolwiek załącznik zawiedzie, bot usuwa reakcję użytkownika i odpowiada
+komunikatem o błędzie. Poprawnie przetworzone załączniki pozostają zapisane, więc
+ponowna reakcja może dokończyć pozostałe bez duplikowania wcześniejszych uploadów.
+Lokalny stan pozwala też dokończyć playlistę lub API strony bez drugiego uploadu
+filmu do YouTube.
 
 ## Uwagi utrzymaniowe
 
