@@ -26,7 +26,9 @@ mediów z Discorda na Google Drive i w galerii internetowej.
 - Upload do galerii przez reakcję: użytkownik z rolą `trustee` dodaje do
   wiadomości niestandardową reakcję `:gallery:`. Obrazy trafiają przez API
   strony do Cloudflare R2, a filmy na kanał YouTube i do wskazanej playlisty.
-  Ponowne użycie reakcji nie tworzy duplikatów tych samych załączników.
+  Bot kolejkowuje obrazy i wysyła do strony tylko jeden naraz, aby ograniczyć
+  zużycie pamięci podczas tworzenia wariantów. Ponowne użycie reakcji nie tworzy
+  duplikatów tych samych załączników.
 - Sprawdzanie konta obsługi faktur na Gmailu automatycznie po starcie
   oraz codziennie o 09:00, 13:00 i 17:00 czasu serwera, plus ręcznie przez
   `/faktury`.
@@ -342,8 +344,9 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
 2. Użytkownik z rolą określoną w `roleIds.trustee` dodaje do wiadomości
    niestandardową reakcję określoną przez `gallery.emojiName` (domyślnie
    `:gallery:`).
-3. Dla obrazu bot wywołuje API strony, które pobiera tymczasowy załącznik
-   Discorda, zapisuje go w R2 i publikuje rekord galerii.
+3. Dla obrazu bot pobiera tymczasowy załącznik Discorda i umieszcza import w
+   globalnej kolejce. API strony otrzymuje tylko jeden obraz naraz, tworzy jego
+   warianty, zapisuje je w R2 i publikuje rekord galerii.
 4. Dla filmu bot rezerwuje rekord strony, wykonuje wznawialny upload do YouTube,
    dodaje film do skonfigurowanej playlisty i finalizuje rekord strony linkiem
    YouTube. Pomyślne przetwarzanie zdjęć i filmów nie publikuje wiadomości na

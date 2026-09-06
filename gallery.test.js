@@ -9,13 +9,13 @@ class AttachmentCollection extends Map {
 	}
 }
 
-function createFixture(attachments) {
+function createFixture(attachments, { messageId = 'message-1' } = {}) {
 	const replies = [];
 	const edits = [];
 	const removedReactions = [];
 	const message = {
-		id: 'message-1',
-		url: 'https://discord.com/channels/guild-1/channel-1/message-1',
+		id: messageId,
+		url: `https://discord.com/channels/guild-1/channel-1/${messageId}`,
 		createdAt: new Date('2026-08-05T12:34:56.000Z'),
 		content: 'Nowości z warsztatu',
 		author: { id: 'author-1', username: 'maker' },
@@ -111,6 +111,56 @@ test('sends images to the website without invoking YouTube', async () => {
 	assert.deepEqual(fixture.removedReactions, []);
 	assert.deepEqual(fixture.replies, []);
 	assert.deepEqual(fixture.edits, []);
+});
+
+test('serializes image ingestion across simultaneous gallery reactions', async () => {
+	const first = createFixture([
+		{
+			id: 'image-1',
+			name: 'first.jpg',
+			contentType: 'image/jpeg',
+			size: 123,
+			url: 'https://cdn.example/first.jpg',
+		},
+	], { messageId: 'message-1' });
+	const second = createFixture([
+		{
+			id: 'image-2',
+			name: 'second.jpg',
+			contentType: 'image/jpeg',
+			size: 456,
+			url: 'https://cdn.example/second.jpg',
+		},
+	], { messageId: 'message-2' });
+	let activeIngestions = 0;
+	let maximumConcurrentIngestions = 0;
+	const completed = [];
+	const deps = dependencies({
+		api: {
+			ingestImage: async (message) => {
+				activeIngestions += 1;
+				maximumConcurrentIngestions = Math.max(
+					maximumConcurrentIngestions,
+					activeIngestions
+				);
+				await new Promise((resolve) => setTimeout(resolve, 20));
+				completed.push(message.id);
+				activeIngestions -= 1;
+				return { success: true, item: {}, suppressed: false };
+			},
+			reserveVideo: async () => ({}),
+			updateVideo: async () => ({}),
+		},
+	});
+	const handler = createGalleryReactionHandler(deps);
+
+	await Promise.all([
+		handler(first.reaction, { id: 'trustee-1', bot: false }),
+		handler(second.reaction, { id: 'trustee-1', bot: false }),
+	]);
+
+	assert.equal(maximumConcurrentIngestions, 1);
+	assert.deepEqual(completed, ['message-1', 'message-2']);
 });
 
 test('uploads videos, adds them to the playlist, and finalizes the website record', async () => {
