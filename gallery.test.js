@@ -109,6 +109,8 @@ test('sends images to the website without invoking YouTube', async () => {
 	assert.equal(ingestions[0].attachment.id, 'image-1');
 	assert.equal(youtubeCalled, false);
 	assert.deepEqual(fixture.removedReactions, []);
+	assert.deepEqual(fixture.replies, []);
+	assert.deepEqual(fixture.edits, []);
 });
 
 test('uploads videos, adds them to the playlist, and finalizes the website record', async () => {
@@ -133,8 +135,9 @@ test('uploads videos, adds them to the playlist, and finalizes the website recor
 		['uploading', 'uploaded', 'playlist_added', 'published']
 	);
 	assert.equal(updates[3].payload.providerId, 'dQw4w9WgXcQ');
-	assert.match(fixture.edits[0], /youtube\.com\/watch\?v=dQw4w9WgXcQ/);
 	assert.deepEqual(fixture.removedReactions, []);
+	assert.deepEqual(fixture.replies, []);
+	assert.deepEqual(fixture.edits, []);
 });
 
 test('resumes website finalization without uploading the same video again', async () => {
@@ -214,7 +217,8 @@ test('does not restore or upload an already published archived video', async () 
 
 	assert.equal(youtubeCalled, false);
 	assert.deepEqual(fixture.removedReactions, []);
-	assert.match(fixture.edits[0], /dQw4w9WgXcQ/);
+	assert.deepEqual(fixture.replies, []);
+	assert.deepEqual(fixture.edits, []);
 });
 
 test('removes the reaction and explains when every upload fails', async () => {
@@ -239,4 +243,66 @@ test('removes the reaction and explains when every upload fails', async () => {
 
 	assert.deepEqual(fixture.removedReactions, ['trustee-1']);
 	assert.match(fixture.replies[0], /Nie udało się/);
+	assert.match(fixture.replies[0], /Reakcję usunięto/);
+});
+
+test('removes the reaction and reports partial attachment failures without a success reply', async () => {
+	const fixture = createFixture([
+		{
+			id: 'image-1',
+			name: 'photo.jpg',
+			contentType: 'image/jpeg',
+			size: 123,
+			url: 'https://cdn.example/photo.jpg',
+		},
+		{
+			id: 'image-2',
+			name: 'broken.jpg',
+			contentType: 'image/jpeg',
+			size: 456,
+			url: 'https://cdn.example/broken.jpg',
+		},
+	]);
+	const handler = createGalleryReactionHandler(dependencies({
+		api: {
+			ingestImage: async (message, attachment) => {
+				if (attachment.id === 'image-2') throw new Error('website unavailable');
+				return { success: true, item: {}, suppressed: false };
+			},
+			reserveVideo: async () => ({}),
+			updateVideo: async () => ({}),
+		},
+	}));
+
+	await handler(fixture.reaction, { id: 'trustee-1', bot: false });
+
+	assert.deepEqual(fixture.removedReactions, ['trustee-1']);
+	assert.equal(fixture.replies.length, 1);
+	assert.match(fixture.replies[0], /1 pliku/);
+	assert.doesNotMatch(fixture.replies[0], /Dodano do galerii/);
+});
+
+test('reports when Discord permissions prevent reaction removal', async () => {
+	const fixture = createFixture([
+		{
+			id: 'image-1',
+			name: 'photo.jpg',
+			contentType: 'image/jpeg',
+			size: 123,
+			url: 'https://cdn.example/photo.jpg',
+		},
+	]);
+	fixture.reaction.users.remove = async () => { throw new Error('missing permissions'); };
+	const handler = createGalleryReactionHandler(dependencies({
+		api: {
+			ingestImage: async () => { throw new Error('website unavailable'); },
+			reserveVideo: async () => ({}),
+			updateVideo: async () => ({}),
+		},
+	}));
+
+	await handler(fixture.reaction, { id: 'trustee-1', bot: false });
+
+	assert.deepEqual(fixture.removedReactions, []);
+	assert.match(fixture.replies[0], /Nie udało się usunąć reakcji/);
 });

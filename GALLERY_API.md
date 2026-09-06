@@ -164,10 +164,11 @@ information. Complete errors remain only in protected bot logs.
 ## Reaction semantics
 
 Every attachment is processed independently. Images use the multipart endpoint;
-videos use reservation, YouTube, playlist and finalization. The bot keeps the
-`:gallery:` reaction if at least one attachment was published, already
-published, archived, or suppressed. It removes the reaction and reports an error
-if nothing succeeded. An unfinished pending video is not a success.
+videos use reservation, YouTube, playlist and finalization. Successful processing
+is silent and leaves the `:gallery:` reaction in place. If any attachment fails,
+the bot removes the trustee's reaction and reports a sanitized error; successful
+attachments remain idempotently recorded, so retrying does not duplicate them.
+An unfinished pending video is not a success.
 
 The website never modifies Discord reactions or messages. The interactive
 Discord-to-Google-Drive workflow remains separate.

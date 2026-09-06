@@ -333,16 +333,18 @@ migracją serwera zdecyduj, które z nich trzeba zachować.
    `:gallery:`).
 3. Dla obrazu bot wywołuje API strony, które pobiera tymczasowy załącznik
    Discorda, zapisuje go w R2 i publikuje rekord galerii.
-4. Dla filmu bot rezerwuje rekord strony, pokazuje na Discordzie status uploadu,
-   wykonuje wznawialny upload do YouTube, dodaje film do skonfigurowanej playlisty
-   i finalizuje rekord strony linkiem YouTube.
+4. Dla filmu bot rezerwuje rekord strony, wykonuje wznawialny upload do YouTube,
+   dodaje film do skonfigurowanej playlisty i finalizuje rekord strony linkiem
+   YouTube. Pomyślne przetwarzanie zdjęć i filmów nie publikuje wiadomości na
+   Discordzie.
 5. Każdy załącznik jest identyfikowany przez Discord attachment ID, więc kolejne
    reakcje nie powodują ponownego uploadu tego samego pliku.
 
-Jeśli wszystkie załączniki zawiodą, bot usuwa reakcję użytkownika i odpowiada
-komunikatem o błędzie. Przy wiadomości mieszanej pozostawia reakcję, publikuje
-poprawne elementy i podaje liczbę błędów. Lokalny stan pozwala po ponowieniu
-dokończyć playlistę lub API strony bez drugiego uploadu filmu do YouTube.
+Jeśli którykolwiek załącznik zawiedzie, bot usuwa reakcję użytkownika i odpowiada
+komunikatem o błędzie. Poprawnie przetworzone załączniki pozostają zapisane, więc
+ponowna reakcja może dokończyć pozostałe bez duplikowania wcześniejszych uploadów.
+Lokalny stan pozwala też dokończyć playlistę lub API strony bez drugiego uploadu
+filmu do YouTube.
 
 ## Uwagi utrzymaniowe
 
