@@ -58,6 +58,7 @@ function createGalleryReactionHandler({
 	logger = console,
 } = {}) {
 	const processingMessageIds = new Set();
+	let imageIngestionQueue = Promise.resolve();
 
 	async function processImage(message, attachment) {
 		const result = await api.ingestImage(message, attachment);
@@ -68,6 +69,12 @@ function createGalleryReactionHandler({
 			suppressed: Boolean(result.suppressed),
 			url: result.item?.url || null,
 		};
+	}
+
+	function queueImage(message, attachment) {
+		const ingestion = imageIngestionQueue.then(() => processImage(message, attachment));
+		imageIngestionQueue = ingestion.catch(() => undefined);
+		return ingestion;
 	}
 
 	async function processVideo(message, attachment) {
@@ -208,7 +215,7 @@ function createGalleryReactionHandler({
 					try {
 						const kind = getMediaKind(attachment);
 						const result = kind === 'image'
-							? await processImage(message, attachment)
+							? await queueImage(message, attachment)
 							: await processVideo(message, attachment);
 						successes.push({ attachment, ...result });
 					} catch (error) {
