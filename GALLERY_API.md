@@ -16,7 +16,8 @@ The token must never be exposed to browser clients or logs.
 
 ## Image attachments
 
-The bot downloads the Discord attachment and forwards it immediately:
+The bot downloads the complete Discord attachment into a bounded buffer, then
+sends a fixed multipart body with an explicit `Content-Length`:
 
 ```http
 POST /api/gallery/import/discord
@@ -45,6 +46,21 @@ The website accepts JPEG, PNG, GIF and WebP. IDs contain 5–32 decimal digits,
 `messageUrl` is a Discord message URL, and the declared MIME type must match the
 decoded image. The website's default maximum is 20 MB, configured with
 `GALLERY_MAX_IMAGE_BYTES`. `attachmentId` supplies idempotency.
+
+Discord download and website upload have independent timeouts. Transient
+connection failures and HTTP 502, 503 or 504 responses are retried twice by
+default. Website-upload retries reuse the same multipart bytes and do not
+download the attachment again. The settings are:
+
+```dotenv
+GALLERY_IMAGE_DOWNLOAD_TIMEOUT_MS=120000
+GALLERY_IMAGE_UPLOAD_TIMEOUT_MS=120000
+GALLERY_API_RETRY_COUNT=2
+GALLERY_API_RETRY_DELAY_MS=500
+```
+
+`GALLERY_API_TIMEOUT_MS` remains the fallback for both image-stage timeouts and
+the timeout used by JSON video lifecycle requests.
 
 ## Video reservation
 

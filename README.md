@@ -85,6 +85,10 @@ GALLERY_DISCORD_INGEST_SECRET=strong_shared_service_token
 GALLERY_MAX_IMAGE_BYTES=20000000
 GALLERY_MAX_DISCORD_VIDEO_BYTES=20000000
 # GALLERY_API_TIMEOUT_MS=120000
+# GALLERY_IMAGE_DOWNLOAD_TIMEOUT_MS=120000
+# GALLERY_IMAGE_UPLOAD_TIMEOUT_MS=120000
+# GALLERY_API_RETRY_COUNT=2
+# GALLERY_API_RETRY_DELAY_MS=500
 YOUTUBE_CHANNEL_ID=expected_youtube_channel_id
 YOUTUBE_PLAYLIST_ID=gallery_playlist_id
 
@@ -123,8 +127,15 @@ Znaczenie zmiennych:
   domyślnie 20 MB.
 - `GALLERY_MAX_DISCORD_VIDEO_BYTES` - limit filmu po obu stronach; domyślnie
   20 MB.
-- `GALLERY_API_TIMEOUT_MS` - limit czasu pobrania i przekazania obrazu albo
-  wywołania JSON; domyślnie 120 sekund.
+- `GALLERY_API_TIMEOUT_MS` - domyślny limit czasu wywołań API galerii i wartość
+  zapasowa dla obu etapów obsługi obrazu; domyślnie 120 sekund.
+- `GALLERY_IMAGE_DOWNLOAD_TIMEOUT_MS` i `GALLERY_IMAGE_UPLOAD_TIMEOUT_MS` -
+  niezależne limity pobrania obrazu z Discorda i wysłania gotowego multipart do
+  strony.
+- `GALLERY_API_RETRY_COUNT` - liczba ponowień po przejściowym błędzie połączenia
+  albo HTTP 502/503/504; domyślnie 2 (łącznie najwyżej 3 próby).
+- `GALLERY_API_RETRY_DELAY_MS` - początkowe opóźnienie ponowienia; domyślnie
+  500 ms i podwaja się przy każdej kolejnej próbie.
 - `YOUTUBE_CHANNEL_ID` - oczekiwany kanał. Bot odmawia uploadu, jeśli token OAuth
   został wystawiony dla innego kanału.
 - `YOUTUBE_PLAYLIST_ID` - zwykła playlista, do której bot dodaje nowe filmy.
