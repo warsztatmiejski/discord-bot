@@ -10,6 +10,7 @@ const {
 	isSupportedMediaAttachment,
 } = require('./gallery-utils');
 const youtube = require('./youtube');
+const { safeYouTubeError } = require('./youtube-errors');
 
 const CONFIG_PATH = path.resolve(__dirname, 'config.json');
 
@@ -161,6 +162,8 @@ function createGalleryReactionHandler({
 
 			return { kind: 'youtube_video', existing: false, url };
 		} catch (error) {
+			error = safeYouTubeError(error);
+			if (error.code === 'youtube_auth_required') failureCode = error.code;
 			await bestEffortSubmissionUpdate(
 				api,
 				submissionId,
@@ -232,7 +235,10 @@ function createGalleryReactionHandler({
 					const retry = reactionRemoved
 						? 'Reakcję usunięto — spróbuj ponownie później.'
 						: 'Nie udało się usunąć reakcji — usuń ją ręcznie przed ponowną próbą.';
-					await sendMessage(message, `❌ ${scope} ${retry}`, logger);
+					const authHint = failures.some(({ error }) => error.code === 'youtube_auth_required')
+						? ' Administrator musi ponownie autoryzować dostęp bota do YouTube.'
+						: '';
+					await sendMessage(message, `❌ ${scope}${authHint} ${retry}`, logger);
 				}
 
 				logger.log(

@@ -356,3 +356,24 @@ test('reports when Discord permissions prevent reaction removal', async () => {
 	assert.deepEqual(fixture.removedReactions, []);
 	assert.match(fixture.replies[0], /Nie udało się usunąć reakcji/);
 });
+
+test('expired YouTube authorization is actionable and does not leak OAuth request data', async () => {
+	const fixture = createFixture([{ id: 'video-auth', name: 'video.mp4', contentType: 'video/mp4', url: 'https://cdn.example/video.mp4' }]);
+	const logs = [];
+	const updates = [];
+	const deps = dependencies();
+	deps.youtubeClient.uploadDiscordVideo = async () => {
+		throw Object.assign(new Error('invalid_grant'), {
+			response: { data: { error: 'invalid_grant' } },
+			config: { data: { refresh_token: 'secret-refresh-token' } },
+		});
+	};
+	deps.logger.error = (...args) => logs.push(args);
+	deps.api.updateVideo = async (id, payload) => updates.push(payload);
+	await createGalleryReactionHandler(deps)(fixture.reaction, { id: 'user-1' });
+	assert.match(fixture.replies[0], /ponownie autoryzować/);
+	assert.ok(updates.some((update) => update.errorCode === 'youtube_auth_required'));
+	assert.equal(JSON.stringify(logs).includes('secret-refresh-token'), false);
+	assert.match(logs[0][1].message, /youtube:auth -- --force/);
+	assert.equal(logs[0][1].cause, undefined);
+});

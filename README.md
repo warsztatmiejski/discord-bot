@@ -280,6 +280,25 @@ Autoryzację YouTube można przygotować przed uruchomieniem bota:
 npm run youtube:auth
 ```
 
+Jeśli Google zwraca `invalid_grant` / `Token has been expired or revoked`,
+wykonaj `npm run youtube:auth -- --force`, używając tego samego
+`YOUTUBE_CREDENTIALS_PATH` i właściwego konta/kanału. Nowy token zostanie zapisany
+pod `YOUTUBE_TOKEN_PATH` (domyślnie `token_youtube.json`) dopiero po sprawdzeniu
+kanału. Na serwerze bez przeglądarki wykonaj autoryzację lokalnie, bezpiecznie
+skopiuj token na serwer i uruchom bota ponownie. Usuń ręcznie nieudaną reakcję
+`gallery` i dodaj ją ponownie.
+
+Sprawdź status aplikacji OAuth w Google Cloud: dla aplikacji External w trybie
+Testing tokeny z uprawnieniami YouTube wygasają po 7 dniach. Przed ponowną
+autoryzacją ustaw odpowiedni status In production; audyt YouTube API dotyczący
+widoczności filmów jest osobną sprawą. Szczegóły:
+https://developers.google.com/identity/protocols/oauth2#expiration
+
+Błąd Discord `50013` podczas usuwania reakcji wymaga uprawnienia Manage Messages
+w danym kanale. Nie jest przyczyną błędu uploadu. Starsze logi mogły zawierać
+refresh token Google — nie udostępniaj ich bez usunięcia danych uwierzytelniających.
+
+
 Przy pierwszym użyciu Google Drive lub YouTube bot otworzy URL autoryzacyjny i
 nasłuchuje callbacku na `localhost:3000`. Dla YouTube należy zalogować się jako
 osoba zarządzająca kanałem wskazanym przez `YOUTUBE_CHANNEL_ID`. Na serwerze bez

@@ -100,7 +100,7 @@ async function requestInitialToken(oAuth2Client, redirectUri) {
 	});
 }
 
-async function authorizeYouTubeInternal() {
+async function authorizeYouTubeInternal({ force = false } = {}) {
 	const credentials = await readOAuthCredentials();
 	const redirectUri = process.env.YOUTUBE_REDIRECT_URI || DEFAULT_REDIRECT_URI;
 	const tokenPath = process.env.YOUTUBE_TOKEN_PATH || DEFAULT_TOKEN_PATH;
@@ -112,10 +112,14 @@ async function authorizeYouTubeInternal() {
 
 	let tokens;
 	try {
+		if (force) throw Object.assign(new Error('Reauthorization requested'), { code: 'ENOENT' });
 		tokens = JSON.parse(await fs.promises.readFile(tokenPath, 'utf8'));
 	} catch (error) {
 		if (error.code !== 'ENOENT') throw error;
 		tokens = await requestInitialToken(oAuth2Client, redirectUri);
+		if (!tokens.refresh_token) throw new Error('Google did not return a refresh token; repeat YouTube authorization with consent.');
+		oAuth2Client.setCredentials(tokens);
+		await verifyAuthorizedChannel(oAuth2Client);
 		await fs.promises.mkdir(path.dirname(tokenPath), { recursive: true });
 		await fs.promises.writeFile(tokenPath, JSON.stringify(tokens), { mode: 0o600 });
 		console.log('YouTube OAuth token stored in', tokenPath);
@@ -125,9 +129,9 @@ async function authorizeYouTubeInternal() {
 	return oAuth2Client;
 }
 
-function authorizeYouTube() {
-	if (!authorizationPromise) {
-		authorizationPromise = authorizeYouTubeInternal().catch((error) => {
+function authorizeYouTube({ force = false } = {}) {
+	if (force || !authorizationPromise) {
+		authorizationPromise = authorizeYouTubeInternal({ force }).catch((error) => {
 			authorizationPromise = null;
 			throw error;
 		});
